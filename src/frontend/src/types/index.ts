@@ -1,0 +1,35 @@
+// Re-export backend types for convenience
+export type {
+  AttendanceInfo,
+  Attendee,
+  AccessRequest,
+  MomentListItem,
+  MomentDetail,
+  Folder,
+  MediaPage,
+  Media,
+  UserProfilePublic,
+  SocialLink,
+  PaymentDetail,
+  Comment,
+  CreateMomentInput,
+  UpdateMomentInput,
+  SaveProfileInput,
+  UploadMediaInput,
+  AddCommentInput,
+  CreateFolderInput,
+  UserId,
+  MomentId,
+  FolderId,
+  MediaId,
+  CommentId,
+  Timestamp,
+} from "../backend";
+
+export {
+  AccessStatus,
+  MediaKind,
+  RsvpStatus,
+  UserRole,
+  Visibility,
+} from "../backend";

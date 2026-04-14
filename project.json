@@ -1,0 +1,26 @@
+{
+  "overview": "EveryMoment is a mobile-first web app for capturing, organizing, and sharing event-centric memories. Users create Moments (weddings, parties, milestones) where media, people, and interactions are organized together, with robust access control for both public and private experiences.",
+  "features": [
+    "Internet Identity passwordless authentication",
+    "Create and manage public or private Moments with UUID sharing",
+    "Calendar view with day/week/30-day toggle showing own and followed users' moments",
+    "Memories tab — conversation-style media and message feed for attending users",
+    "Event Pass QR modal for RSVP'd users",
+    "Editable profile with dynamic payment details",
+    "Advanced Explore filters with Near Me location search",
+    "Modern share modal with copy link and collapsible QR",
+    "Admin dashboard with CSV bulk import",
+    "OpenStreetMap location integration"
+  ],
+  "category": "social",
+  "tags": [
+    "events",
+    "memories",
+    "social",
+    "media-sharing",
+    "calendar",
+    "mobile-first",
+    "internet-identity"
+  ],
+  "last_updated": "2026-04-14T13:16:05.905Z"
+}

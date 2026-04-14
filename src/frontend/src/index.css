@@ -1,0 +1,237 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: "General Sans";
+    --font-body: "DM Sans";
+    --font-mono: "Geist Mono";
+    --radius: 0.625rem;
+
+    --background: 0.98 0 0;
+    --foreground: 0.12 0 0;
+    --card: 1 0 0;
+    --card-foreground: 0.12 0 0;
+    --popover: 1 0 0;
+    --popover-foreground: 0.12 0 0;
+
+    --primary: 0.15 0 0;
+    --primary-foreground: 0.98 0 0;
+
+    --secondary: 0.94 0 0;
+    --secondary-foreground: 0.2 0 0;
+    --muted: 0.94 0 0;
+    --muted-foreground: 0.48 0 0;
+
+    --accent: 0.15 0 0;
+    --accent-foreground: 0.98 0 0;
+
+    --destructive: 0.52 0.2 22;
+    --destructive-foreground: 0.98 0 0;
+
+    --success: 0.62 0.17 142;
+    --success-foreground: 0.98 0 0;
+
+    --border: 0.9 0 0;
+    --input: 0.9 0 0;
+    --ring: 0.15 0 0;
+
+    --chart-1: 0.62 0.17 142;
+    --chart-2: 0.52 0.2 22;
+    --chart-3: 0.15 0 0;
+    --chart-4: 0.72 0 0;
+    --chart-5: 0.48 0 0;
+
+    --sidebar: 0.98 0 0;
+    --sidebar-foreground: 0.12 0 0;
+    --sidebar-primary: 0.15 0 0;
+    --sidebar-primary-foreground: 0.98 0 0;
+    --sidebar-accent: 0.94 0 0;
+    --sidebar-accent-foreground: 0.2 0 0;
+    --sidebar-border: 0.9 0 0;
+    --sidebar-ring: 0.15 0 0;
+  }
+
+  .dark {
+    --background: 0.11 0 0;
+    --foreground: 0.96 0 0;
+    --card: 0.15 0 0;
+    --card-foreground: 0.96 0 0;
+    --popover: 0.17 0 0;
+    --popover-foreground: 0.96 0 0;
+
+    --primary: 0.9 0 0;
+    --primary-foreground: 0.11 0 0;
+
+    --secondary: 0.2 0 0;
+    --secondary-foreground: 0.88 0 0;
+    --muted: 0.19 0 0;
+    --muted-foreground: 0.55 0 0;
+
+    --accent: 0.9 0 0;
+    --accent-foreground: 0.11 0 0;
+
+    --destructive: 0.62 0.2 22;
+    --destructive-foreground: 0.11 0 0;
+
+    --success: 0.56 0.15 142;
+    --success-foreground: 0.11 0 0;
+
+    --border: 0.23 0 0;
+    --input: 0.23 0 0;
+    --ring: 0.9 0 0;
+
+    --chart-1: 0.56 0.15 142;
+    --chart-2: 0.62 0.2 22;
+    --chart-3: 0.9 0 0;
+    --chart-4: 0.42 0 0;
+    --chart-5: 0.62 0 0;
+
+    --sidebar: 0.15 0 0;
+    --sidebar-foreground: 0.96 0 0;
+    --sidebar-primary: 0.9 0 0;
+    --sidebar-primary-foreground: 0.11 0 0;
+    --sidebar-accent: 0.19 0 0;
+    --sidebar-accent-foreground: 0.88 0 0;
+    --sidebar-border: 0.23 0 0;
+    --sidebar-ring: 0.9 0 0;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
+
+@font-face {
+  font-family: "General Sans";
+  src: url("/assets/fonts/GeneralSans.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Sans";
+  src: url("/assets/fonts/DMSans.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono.woff2") format("woff2");
+  font-display: swap;
+}
+
+@layer utilities {
+  .transition-smooth {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-elevated {
+    @apply bg-card border border-border rounded-lg shadow-sm;
+  }
+
+  .tap-target {
+    @apply min-h-11 min-w-11;
+  }
+
+  .glass-header {
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    background-color: oklch(var(--card) / 0.85);
+  }
+
+  /* Modal overlay */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/40 z-modal transition-smooth;
+  }
+
+  .modal-content {
+    @apply bg-card border border-border rounded-lg shadow-md max-w-md mx-auto;
+  }
+
+  /* Form section cards */
+  .form-section {
+    @apply bg-muted/30 border border-border rounded-lg p-4;
+  }
+
+  /* Filter chip/tag */
+  .filter-chip {
+    @apply inline-flex items-center gap-1 px-3 py-1.5 bg-muted border border-border rounded-full text-sm transition-smooth hover:bg-muted/80;
+  }
+
+  .filter-chip-remove {
+    @apply ml-1 cursor-pointer hover:opacity-60;
+  }
+
+  /* Copy button feedback */
+  .copy-button {
+    @apply relative px-4 py-2 bg-muted border border-border rounded-lg transition-smooth hover:bg-muted/80 active:bg-primary active:text-primary-foreground;
+  }
+
+  .copy-feedback {
+    @apply absolute inset-0 flex items-center justify-center bg-success text-success-foreground rounded-lg opacity-0 transition-smooth;
+  }
+
+  .copy-feedback.show {
+    @apply opacity-100;
+  }
+
+  /* Collapsible section toggle */
+  .collapsible-toggle {
+    @apply flex items-center justify-between w-full px-4 py-3 bg-muted/20 border border-border rounded-lg cursor-pointer transition-smooth hover:bg-muted/40;
+  }
+
+  .collapsible-toggle[data-open="true"] .chevron {
+    @apply rotate-180;
+  }
+
+  .chevron {
+    @apply transition-smooth;
+  }
+
+  /* List item (socials, payment details) */
+  .list-item {
+    @apply flex items-center justify-between gap-2 p-3 bg-muted/20 border border-border rounded-lg;
+  }
+
+  .list-item-remove {
+    @apply p-1 hover:bg-destructive/10 rounded transition-smooth;
+  }
+
+  /* Add button for lists */
+  .add-button {
+    @apply px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm transition-smooth hover:opacity-80 active:opacity-60;
+  }
+
+  /* Z-index scale */
+  .z-content {
+    z-index: 10;
+  }
+  .z-dropdown {
+    z-index: 20;
+  }
+  .z-bottom-nav {
+    z-index: 30;
+  }
+  .z-header {
+    z-index: 40;
+  }
+  .z-modal {
+    z-index: 50;
+  }
+  .z-toast {
+    z-index: 100;
+  }
+}

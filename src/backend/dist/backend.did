@@ -1,0 +1,354 @@
+type _ImmutableObjectStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _ImmutableObjectStorageRefillInformation = record {
+                                                  proposed_top_up_amount:
+                                                   opt nat;};
+type _ImmutableObjectStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type Visibility = 
+ variant {
+   private;
+   public;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserProfilePublic = 
+ record {
+   createdAt: Timestamp;
+   followersCount: nat;
+   followingCount: nat;
+   id: UserId;
+   location: opt text;
+   name: opt text;
+   paymentDetails: opt vec PaymentDetail;
+   photo: opt ExternalBlob;
+   socials: opt vec SocialLink;
+   username: text;
+ };
+type UserId = principal;
+type UploadMediaInput = 
+ record {
+   "blob": ExternalBlob;
+   filename: text;
+   folderId: FolderId;
+   kind: MediaKind;
+   momentId: MomentId;
+ };
+type UpdateMomentInput = 
+ record {
+   coverImage: opt ExternalBlob;
+   description: text;
+   eventDate: Timestamp;
+   location: text;
+   locationLat: opt float64;
+   locationLng: opt float64;
+   tags: vec text;
+   title: text;
+   visibility: Visibility;
+ };
+type Timestamp = int;
+type SocialLink = 
+ record {
+   name: text;
+   url: text;
+ };
+type SaveProfileInput = 
+ record {
+   location: opt text;
+   name: opt text;
+   paymentDetails: opt vec PaymentDetail;
+   photo: opt ExternalBlob;
+   socials: opt vec SocialLink;
+   username: text;
+ };
+type RsvpStatus = 
+ variant {
+   attending;
+   maybe;
+   notAttending;
+ };
+type PaymentDetail = 
+ record {
+   name: text;
+   value: text;
+ };
+type MomentListItem = 
+ record {
+   attendeeCount: nat;
+   callerRelation: opt CallerRelation;
+   coverImage: opt ExternalBlob;
+   createdAt: Timestamp;
+   description: text;
+   eventDate: Timestamp;
+   id: MomentId;
+   location: text;
+   locationLat: opt float64;
+   locationLng: opt float64;
+   owner: UserId;
+   tags: vec text;
+   title: text;
+   visibility: Visibility;
+ };
+type MomentId = text;
+type MomentDetail = 
+ record {
+   attendeeCount: nat;
+   callerAccessStatus: opt AccessStatus;
+   coverImage: opt ExternalBlob;
+   createdAt: Timestamp;
+   description: text;
+   eventDate: Timestamp;
+   id: MomentId;
+   isOwner: bool;
+   location: text;
+   locationLat: opt float64;
+   locationLng: opt float64;
+   owner: UserId;
+   tags: vec text;
+   title: text;
+   updatedAt: Timestamp;
+   visibility: Visibility;
+ };
+type MemoryWithAuthor = 
+ record {
+   authorDisplayName: text;
+   authorId: UserId;
+   authorUsername: text;
+   content: text;
+   createdAt: Timestamp;
+   id: MemoryId;
+   mediaBlob: opt ExternalBlob;
+   mediaKind: opt MemoryMediaKind;
+   momentId: MomentId;
+ };
+type MemoryMediaKind = 
+ variant {
+   audio;
+   image;
+   video;
+ };
+type MemoryId = text;
+type MediaPage = 
+ record {
+   items: vec Media;
+   nextOffset: opt nat;
+   total: nat;
+ };
+type MediaKind = 
+ variant {
+   audio;
+   document;
+   image;
+   video;
+ };
+type MediaId = nat;
+type Media = 
+ record {
+   "blob": ExternalBlob;
+   createdAt: Timestamp;
+   filename: text;
+   folderId: FolderId;
+   id: MediaId;
+   kind: MediaKind;
+   likeCount: nat;
+   momentId: MomentId;
+   uploadedBy: UserId;
+ };
+type FolderId = nat;
+type Folder = 
+ record {
+   createdAt: Timestamp;
+   id: FolderId;
+   isDefault: bool;
+   momentId: MomentId;
+   name: text;
+ };
+type ExternalBlob = blob;
+type CreateMomentInput = 
+ record {
+   coverImage: opt ExternalBlob;
+   description: text;
+   eventDate: Timestamp;
+   location: text;
+   locationLat: opt float64;
+   locationLng: opt float64;
+   tags: vec text;
+   title: text;
+   visibility: Visibility;
+ };
+type CreateFolderInput = 
+ record {
+   momentId: MomentId;
+   name: text;
+ };
+type CommentId = nat;
+type Comment = 
+ record {
+   author: UserId;
+   createdAt: Timestamp;
+   id: CommentId;
+   mediaId: MediaId;
+   parentId: opt CommentId;
+   "text": text;
+ };
+type CallerRelation = 
+ variant {
+   following;
+   owned;
+   rsvp: RsvpStatus;
+ };
+type BulkImportResult = 
+ record {
+   errors: vec record {
+                 message: text;
+                 row: nat;
+               };
+   successCount: nat;
+ };
+type BulkImportMomentRow = 
+ record {
+   description: opt text;
+   endDate: opt Timestamp;
+   location: opt text;
+   locationLat: opt float64;
+   locationLng: opt float64;
+   maxAttendees: opt nat;
+   startDate: Timestamp;
+   tags: vec text;
+   title: text;
+   visibility: text;
+ };
+type Attendee = 
+ record {
+   joinedAt: Timestamp;
+   momentId: MomentId;
+   rsvpStatus: RsvpStatus;
+   userId: UserId;
+ };
+type AttendanceInfo = 
+ record {
+   momentDate: Timestamp;
+   momentTitle: text;
+   rsvpTime: Timestamp;
+   status: text;
+   username: text;
+ };
+type AddCommentInput = 
+ record {
+   mediaId: MediaId;
+   parentId: opt CommentId;
+   "text": text;
+ };
+type AccessStatus = 
+ variant {
+   approved;
+   denied;
+   pending;
+   revoked;
+ };
+type AccessRequest = 
+ record {
+   momentId: MomentId;
+   requestedAt: Timestamp;
+   requester: UserId;
+   resolvedAt: opt Timestamp;
+   status: AccessStatus;
+ };
+service : {
+  _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
+  _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
+  _immutableObjectStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _immutableObjectStorageCreateCertificate: (blobHash: text) ->
+   (_ImmutableObjectStorageCreateCertificateResult);
+  _immutableObjectStorageRefillCashier: (refillInformation:
+   opt _ImmutableObjectStorageRefillInformation) ->
+   (_ImmutableObjectStorageRefillResult);
+  _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
+  _initializeAccessControl: () -> ();
+  addComment: (input: AddCommentInput) -> (CommentId);
+  adminBulkImportMoments: (rows: vec BulkImportMomentRow) ->
+   (BulkImportResult);
+  adminDeleteMedia: (mediaId: MediaId) -> ();
+  adminDeleteMoment: (momentId: MomentId) -> ();
+  adminDeleteUser: (userId: UserId) -> ();
+  adminListMedia: () -> (vec Media) query;
+  adminListMoments: () -> (vec MomentListItem) query;
+  adminListUsers: () -> (vec UserProfilePublic) query;
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  createFolder: (input: CreateFolderInput) -> (FolderId);
+  createMoment: (input: CreateMomentInput) -> (MomentId);
+  deleteComment: (commentId: CommentId) -> ();
+  deleteFolder: (folderId: FolderId) -> ();
+  deleteMedia: (mediaId: MediaId) -> ();
+  deleteMemory: (memoryId: MemoryId) -> (variant {
+                                           err: text;
+                                           ok;
+                                         });
+  deleteMoment: (momentId: MomentId) -> ();
+  followUser: (target: UserId) -> ();
+  getCallerUserProfile: () -> (opt UserProfilePublic) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getFeedMoments: () -> (vec MomentListItem) query;
+  getFollowers: (userId: UserId) -> (vec UserProfilePublic) query;
+  getFollowing: (userId: UserId) -> (vec UserProfilePublic) query;
+  getMedia: (mediaId: MediaId) -> (opt Media) query;
+  getMemories: (momentId: MomentId, limit: nat, before: opt Timestamp) ->
+   (variant {
+      err: text;
+      ok: vec MemoryWithAuthor;
+    }) query;
+  getMomentAccessStatus: (momentId: MomentId) -> (opt AccessStatus) query;
+  getMomentAttendees: (momentId: MomentId) -> (vec Attendee) query;
+  getMomentDetail: (momentId: MomentId) -> (opt MomentDetail) query;
+  getMomentPublicUrl: (momentId: MomentId) -> (text) query;
+  getMomentQrCode: (momentId: MomentId) -> (text) query;
+  getMomentShareUrl: (momentId: MomentId) -> (text) query;
+  getMomentsForUser: (userId: UserId) -> (vec MomentListItem) query;
+  getMyAttendanceInfo: (momentId: MomentId) -> (opt AttendanceInfo) query;
+  getMyCalendarMoments: () -> (vec MomentListItem) query;
+  getMyMoments: () -> (vec MomentListItem) query;
+  getUserProfile: (userId: UserId) -> (opt UserProfilePublic) query;
+  getUserProfileByUsername: (username: text) -> (opt UserProfilePublic) query;
+  hasLikedMedia: (mediaId: MediaId) -> (bool) query;
+  isCallerAdmin: () -> (bool) query;
+  isFollowingUser: (target: UserId) -> (bool) query;
+  isUsernameTaken: (username: text) -> (bool) query;
+  listComments: (mediaId: MediaId) -> (vec Comment) query;
+  listFolders: (momentId: MomentId) -> (vec Folder) query;
+  listMedia: (momentId: MomentId, offset: nat, limit: nat) ->
+   (MediaPage) query;
+  listMediaByFolder: (folderId: FolderId, offset: nat, limit: nat) ->
+   (MediaPage) query;
+  listMomentAccessRequests: (momentId: MomentId) -> (vec AccessRequest) query;
+  postMemory: (momentId: MomentId, content: text, mediaBlob:
+   opt ExternalBlob, mediaKind: opt MemoryMediaKind) ->
+   (variant {
+      err: text;
+      ok: MemoryId;
+    });
+  requestMomentAccess: (momentId: MomentId) -> (variant {
+                                                  err: text;
+                                                  ok;
+                                                });
+  resolveAccessRequest: (momentId: MomentId, requester: UserId, approved:
+   bool) -> ();
+  revokeMomentAccess: (momentId: MomentId, userId: UserId) -> ();
+  saveCallerUserProfile: (input: SaveProfileInput) -> ();
+  searchMoments: (searchText: opt text, tags: vec text, offset: nat, limit:
+   nat) -> (vec MomentListItem) query;
+  setRsvp: (momentId: MomentId, status: RsvpStatus) -> ();
+  toggleLike: (mediaId: MediaId) -> (nat);
+  unfollowUser: (target: UserId) -> ();
+  updateMoment: (momentId: MomentId, input: UpdateMomentInput) -> ();
+  uploadMedia: (input: UploadMediaInput) -> (MediaId);
+}

@@ -1,0 +1,165 @@
+// Version: 1.0.0
+type AccessRequest__504144355 =
+  {
+    momentId : MomentId__514222491;
+    requestedAt : Timestamp__301639476;
+    requester : UserId__158757552;
+    resolvedAt : ?Timestamp__301639476;
+    status : AccessStatus__752683970
+  };
+type AccessStatus__752683970 = {#approved; #denied; #pending; #revoked};
+type Attendee__358347398 =
+  {
+    joinedAt : Timestamp__301639476;
+    momentId : MomentId__514222491;
+    rsvpStatus : RsvpStatus__968306091;
+    userId : UserId__158757552
+  };
+type CommentId__821569710 = Nat;
+type Comment__497442883 =
+  {
+    author : UserId__158757552;
+    createdAt : Timestamp__301639476;
+    id : CommentId__821569710;
+    mediaId : MediaId__168331846;
+    parentId : ?CommentId__821569710;
+    text : Text
+  };
+type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type ExternalBlob__246066408 = Blob;
+type FolderId__432322121 = Nat;
+type Folder__373437713 =
+  {
+    createdAt : Timestamp__301639476;
+    id : FolderId__432322121;
+    isDefault : Bool;
+    momentId : MomentId__514222491;
+    name : Text
+  };
+type Internal__667636161<T> =
+  {children : [var ?Node__92254746<T>]; data : Data__159895909<T>};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__520550824<T> = {data : Data__159895909<T>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type MediaId__168331846 = Nat;
+type MediaKind__379861118 = {#audio; #document; #image; #video};
+type Media__924822250 =
+  {
+    blob : ExternalBlob__246066408;
+    createdAt : Timestamp__301639476;
+    filename : Text;
+    folderId : FolderId__432322121;
+    id : MediaId__168331846;
+    kind : MediaKind__379861118;
+    likeCount : Nat;
+    momentId : MomentId__514222491;
+    uploadedBy : UserId__158757552
+  };
+type MemoryId__742482266 = Text;
+type MemoryMediaKind__848785012 = {#audio; #image; #video};
+type Memory__757955936 =
+  {
+    authorId : UserId__158757552;
+    content : Text;
+    createdAt : Timestamp__301639476;
+    id : MemoryId__742482266;
+    mediaBlob : ?ExternalBlob__246066408;
+    mediaKind : ?MemoryMediaKind__848785012;
+    momentId : MomentId__514222491
+  };
+type MomentId__514222491 = Text;
+type Moment__145803432 =
+  {
+    coverImage : ?ExternalBlob__246066408;
+    createdAt : Timestamp__301639476;
+    description : Text;
+    eventDate : Timestamp__301639476;
+    id : MomentId__514222491;
+    location : Text;
+    locationLat : ?Float;
+    locationLng : ?Float;
+    owner : UserId__158757552;
+    tags : [Text];
+    title : Text;
+    updatedAt : Timestamp__301639476;
+    visibility : Visibility__640576773
+  };
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type Node__92254746<T> =
+  {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
+type PaymentDetail__1058553334 = {name : Text; value : Text};
+type RsvpStatus__968306091 = {#attending; #maybe; #notAttending};
+type Set__532252804<T> = Set__710576254<T>;
+type Set__710576254<T> =
+  {var root : Node__92254746<T>; var size : Nat__490723111};
+type SocialLink__692406830 = {name : Text; url : Text};
+type Timestamp__301639476 = Int;
+type UserId__158757552 = Principal;
+type UserProfile__277265826 =
+  {
+    createdAt : Timestamp__301639476;
+    id : UserId__158757552;
+    location : ?Text;
+    name : ?Text;
+    paymentDetails : ?[PaymentDetail__1058553334];
+    photo : ?ExternalBlob__246066408;
+    socials : ?[SocialLink__692406830];
+    username : Text
+  };
+type UserRole__1054455867 = {#admin; #guest; #user};
+type Visibility__640576773 = {#private_; #public_};
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable mediaState :
+    {
+      comments : Map__605269027<CommentId__821569710, Comment__497442883>;
+      folders : Map__605269027<FolderId__432322121, Folder__373437713>;
+      likes :
+        Map__605269027<MediaId__168331846, Set__532252804<UserId__158757552>>;
+      media : Map__605269027<MediaId__168331846, Media__924822250>;
+      var nextCommentId : CommentId__821569710;
+      var nextFolderId : FolderId__432322121;
+      var nextMediaId : MediaId__168331846
+    };
+  stable memoriesState :
+    {
+      memories : Map__605269027<MemoryId__742482266, Memory__757955936>;
+      var memoryCounter : Nat
+    };
+  stable momentsState :
+    {
+      accessRequests :
+        Map__605269027<(MomentId__514222491, UserId__158757552),
+                        AccessRequest__504144355>;
+      attendees :
+        Map__605269027<(MomentId__514222491, UserId__158757552),
+                        Attendee__358347398>;
+      grantedAccess :
+        Map__605269027<MomentId__514222491, Set__532252804<UserId__158757552>>;
+      var idCounter : Nat;
+      moments : Map__605269027<MomentId__514222491, Moment__145803432>
+    };
+  stable usersState :
+    {
+      followers :
+        Map__605269027<UserId__158757552, Set__532252804<UserId__158757552>>;
+      following :
+        Map__605269027<UserId__158757552, Set__532252804<UserId__158757552>>;
+      profiles : Map__605269027<UserId__158757552, UserProfile__277265826>;
+      usernameIndex : Map__605269027<Text, UserId__158757552>
+    }
+};
