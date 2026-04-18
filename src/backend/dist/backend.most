@@ -86,6 +86,7 @@ type Moment__145803432 =
     locationLat : ?Float;
     locationLng : ?Float;
     owner : UserId__158757552;
+    recurrence : ?RecurrenceRule__1031207458;
     tags : [Text];
     title : Text;
     updatedAt : Timestamp__301639476;
@@ -98,6 +99,16 @@ type Node__46230540<K, V> =
 type Node__92254746<T> =
   {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
 type PaymentDetail__1058553334 = {name : Text; value : Text};
+type RecurrenceEndCondition__300588335 =
+  {#count : Nat; #endDate : Timestamp__301639476; #never};
+type RecurrenceFrequency__344540045 = {#daily; #monthly; #weekly; #yearly};
+type RecurrenceRule__1031207458 =
+  {
+    daysOfWeek : [Nat];
+    endCondition : RecurrenceEndCondition__300588335;
+    frequency : RecurrenceFrequency__344540045;
+    interval : Nat
+  };
 type RsvpStatus__968306091 = {#attending; #maybe; #notAttending};
 type Set__532252804<T> = Set__710576254<T>;
 type Set__710576254<T> =

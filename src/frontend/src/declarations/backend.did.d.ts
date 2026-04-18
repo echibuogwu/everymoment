@@ -42,6 +42,7 @@ export interface Attendee {
 export interface BulkImportMomentRow {
   'locationLat' : [] | [number],
   'locationLng' : [] | [number],
+  'coverImageUrl' : [] | [string],
   'title' : string,
   'endDate' : [] | [Timestamp],
   'maxAttendees' : [] | [bigint],
@@ -54,6 +55,7 @@ export interface BulkImportMomentRow {
 export interface BulkImportResult {
   'errors' : Array<{ 'row' : bigint, 'message' : string }>,
   'successCount' : bigint,
+  'warnings' : Array<{ 'row' : bigint, 'message' : string }>,
 }
 export type CallerRelation = { 'owned' : null } |
   { 'rsvp' : RsvpStatus } |
@@ -74,6 +76,7 @@ export interface CreateMomentInput {
   'title' : string,
   'tags' : Array<string>,
   'description' : string,
+  'recurrence' : [] | [RecurrenceRule],
   'coverImage' : [] | [ExternalBlob],
   'visibility' : Visibility,
   'location' : string,
@@ -135,6 +138,7 @@ export interface MomentDetail {
   'createdAt' : Timestamp,
   'tags' : Array<string>,
   'description' : string,
+  'recurrence' : [] | [RecurrenceRule],
   'coverImage' : [] | [ExternalBlob],
   'updatedAt' : Timestamp,
   'visibility' : Visibility,
@@ -153,13 +157,28 @@ export interface MomentListItem {
   'createdAt' : Timestamp,
   'tags' : Array<string>,
   'description' : string,
+  'recurrence' : [] | [RecurrenceRule],
   'coverImage' : [] | [ExternalBlob],
+  'occurrenceDate' : [] | [Timestamp],
   'callerRelation' : [] | [CallerRelation],
   'visibility' : Visibility,
   'location' : string,
   'eventDate' : Timestamp,
 }
 export interface PaymentDetail { 'value' : string, 'name' : string }
+export type RecurrenceEndCondition = { 'endDate' : Timestamp } |
+  { 'count' : bigint } |
+  { 'never' : null };
+export type RecurrenceFrequency = { 'monthly' : null } |
+  { 'yearly' : null } |
+  { 'daily' : null } |
+  { 'weekly' : null };
+export interface RecurrenceRule {
+  'endCondition' : RecurrenceEndCondition,
+  'interval' : bigint,
+  'daysOfWeek' : Array<bigint>,
+  'frequency' : RecurrenceFrequency,
+}
 export type RsvpStatus = { 'maybe' : null } |
   { 'notAttending' : null } |
   { 'attending' : null };
@@ -179,6 +198,7 @@ export interface UpdateMomentInput {
   'title' : string,
   'tags' : Array<string>,
   'description' : string,
+  'recurrence' : [] | [RecurrenceRule],
   'coverImage' : [] | [ExternalBlob],
   'visibility' : Visibility,
   'location' : string,
@@ -245,6 +265,7 @@ export interface _SERVICE {
     [Array<BulkImportMomentRow>],
     BulkImportResult
   >,
+  'adminDeleteAllMoments' : ActorMethod<[], undefined>,
   'adminDeleteMedia' : ActorMethod<[MediaId], undefined>,
   'adminDeleteMoment' : ActorMethod<[MomentId], undefined>,
   'adminDeleteUser' : ActorMethod<[UserId], undefined>,
@@ -266,6 +287,11 @@ export interface _SERVICE {
   'followUser' : ActorMethod<[UserId], undefined>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfilePublic]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getEventPassInfo' : ActorMethod<
+    [MomentId, UserId],
+    { 'ok' : AttendanceInfo } |
+      { 'err' : string }
+  >,
   'getFeedMoments' : ActorMethod<[], Array<MomentListItem>>,
   'getFollowers' : ActorMethod<[UserId], Array<UserProfilePublic>>,
   'getFollowing' : ActorMethod<[UserId], Array<UserProfilePublic>>,
@@ -283,7 +309,10 @@ export interface _SERVICE {
   'getMomentShareUrl' : ActorMethod<[MomentId], string>,
   'getMomentsForUser' : ActorMethod<[UserId], Array<MomentListItem>>,
   'getMyAttendanceInfo' : ActorMethod<[MomentId], [] | [AttendanceInfo]>,
-  'getMyCalendarMoments' : ActorMethod<[], Array<MomentListItem>>,
+  'getMyCalendarMoments' : ActorMethod<
+    [Timestamp, Timestamp],
+    Array<MomentListItem>
+  >,
   'getMyMoments' : ActorMethod<[], Array<MomentListItem>>,
   'getUserProfile' : ActorMethod<[UserId], [] | [UserProfilePublic]>,
   'getUserProfileByUsername' : ActorMethod<[string], [] | [UserProfilePublic]>,
@@ -310,7 +339,17 @@ export interface _SERVICE {
   'revokeMomentAccess' : ActorMethod<[MomentId, UserId], undefined>,
   'saveCallerUserProfile' : ActorMethod<[SaveProfileInput], undefined>,
   'searchMoments' : ActorMethod<
-    [[] | [string], Array<string>, bigint, bigint],
+    [
+      [] | [string],
+      Array<string>,
+      [] | [Timestamp],
+      [] | [Timestamp],
+      [] | [number],
+      [] | [number],
+      [] | [number],
+      bigint,
+      bigint,
+    ],
     Array<MomentListItem>
   >,
   'setRsvp' : ActorMethod<[MomentId, RsvpStatus], undefined>,

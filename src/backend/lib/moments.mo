@@ -4,6 +4,7 @@ import Set "mo:core/Set";
 import Time "mo:core/Time";
 import Text "mo:core/Text";
 import Int "mo:core/Int";
+import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import Common "../types/common";
@@ -100,7 +101,7 @@ module {
   };
 
   // ── Helper: convert Moment to MomentListItem ──────────────────────────────
-  func _toListItem(state : MomentsState, m : T.Moment, callerRelation : ?T.CallerRelation) : T.MomentListItem {
+  func _toListItem(state : MomentsState, m : T.Moment, callerRelation : ?T.CallerRelation, occurrenceDate : ?Common.Timestamp) : T.MomentListItem {
     {
       id = m.id;
       owner = m.owner;
@@ -116,7 +117,91 @@ module {
       attendeeCount = _attendeeCount(state, m.id);
       createdAt = m.createdAt;
       callerRelation = callerRelation;
+      occurrenceDate = occurrenceDate;
+      recurrence = m.recurrence;
     };
+  };
+
+  // ── Recurrence expansion ──────────────────────────────────────────────────
+
+  // Nanoseconds-per-unit helpers used by expandRecurrenceInRange.
+  // Exposed for testing — not part of the public mixin API.
+  public func nanosPerDay() : Nat { 86_400 * 1_000_000_000 };
+
+  // Expand a recurring moment's rule into concrete occurrence timestamps within
+  // [rangeStart, rangeEnd] (both in nanoseconds).
+  // Returns an array of occurrence timestamps (nanoseconds since epoch).
+  // "edit all" semantics: the rule on the moment defines ALL occurrences.
+  public func expandRecurrenceInRange(
+    m : T.Moment,
+    rangeStart : Common.Timestamp,
+    rangeEnd : Common.Timestamp
+  ) : [Common.Timestamp] {
+    let rule = switch (m.recurrence) {
+      case null return [];
+      case (?r) r;
+    };
+
+    let nsPerDay : Int = 86_400 * 1_000_000_000;
+    let interval : Int = if (rule.interval >= 1) rule.interval else 1;
+
+    // Step size in nanoseconds depending on frequency
+    let stepNs : Int = switch (rule.frequency) {
+      case (#daily)   nsPerDay * interval;
+      case (#weekly)  nsPerDay * 7 * interval;
+      case (#monthly) nsPerDay * 30 * interval;
+      case (#yearly)  nsPerDay * 365 * interval;
+    };
+
+    let results = List.empty<Common.Timestamp>();
+    var current : Int = m.eventDate;
+    var occurrenceCount : Nat = 0;
+
+    // Walk occurrences forward from the event date
+    while (current <= rangeEnd) {
+      // Check end condition
+      switch (rule.endCondition) {
+        case (#endDate(ed)) {
+          if (current > ed) return results.toArray();
+        };
+        case (#count(n)) {
+          if (occurrenceCount >= n) return results.toArray();
+        };
+        case (#never) {};
+      };
+
+      // For weekly with daysOfWeek, emit one item per matching day-of-week offset
+      if (rule.frequency == #weekly and rule.daysOfWeek.size() > 0) {
+        // Each element of daysOfWeek is an offset (0 = event's day, 1 = +1 day, etc.)
+        for (dayOffset in rule.daysOfWeek.values()) {
+          let occTs = current + nsPerDay * dayOffset;
+          if (occTs >= rangeStart and occTs <= rangeEnd) {
+            // Re-check end condition per sub-occurrence
+            var subExceeded = false;
+            switch (rule.endCondition) {
+              case (#endDate(ed)) { if (occTs > ed) subExceeded := true };
+              case _ {};
+            };
+            if (not subExceeded) {
+              results.add(occTs);
+              occurrenceCount += 1;
+            };
+          } else if (occTs >= rangeStart) {
+            occurrenceCount += 1;
+          };
+        };
+      } else {
+        // Single occurrence per step
+        if (current >= rangeStart) {
+          results.add(current);
+        };
+        occurrenceCount += 1;
+      };
+
+      current := current + stepNs;
+    };
+
+    results.toArray();
   };
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -137,6 +222,7 @@ module {
       visibility = input.visibility;
       createdAt = now;
       updatedAt = now;
+      recurrence = input.recurrence;
     };
     state.moments.add(id, moment);
 
@@ -182,6 +268,7 @@ module {
           coverImage = input.coverImage;
           visibility = input.visibility;
           updatedAt = Time.now();
+          recurrence = input.recurrence;
         };
         state.moments.add(momentId, updated);
       };
@@ -233,45 +320,172 @@ module {
   };
 
   // ── Listing / search ──────────────────────────────────────────────────────
-  public func listPublicMoments(state : MomentsState, searchText : ?Text, filterTags : [Text], offset : Nat, limit : Nat) : [T.MomentListItem] {
+
+  // Haversine distance in km between two lat/lng points
+  func _distanceKm(lat1 : Float, lng1 : Float, lat2 : Float, lng2 : Float) : Float {
+    let r : Float = 6371.0;
+    let dLat = (lat2 - lat1) * 3.14159265358979 / 180.0;
+    let dLng = (lng2 - lng1) * 3.14159265358979 / 180.0;
+    let la1 = lat1 * 3.14159265358979 / 180.0;
+    let la2 = lat2 * 3.14159265358979 / 180.0;
+    // sin^2(dLat/2)
+    let sinDLat = _sin(dLat / 2.0);
+    let sinDLng = _sin(dLng / 2.0);
+    let a = sinDLat * sinDLat + _cos(la1) * _cos(la2) * sinDLng * sinDLng;
+    let c = 2.0 * _atan2(_sqrt(a), _sqrt(1.0 - a));
+    r * c;
+  };
+
+  // Simple float math helpers (IC Motoko Float has these via WASM)
+  func _sin(x : Float) : Float {
+    // Use series approximation: sin(x) ≈ x - x^3/6 + x^5/120 - x^7/5040
+    let x2 = x * x;
+    x * (1.0 - x2 / 6.0 * (1.0 - x2 / 20.0 * (1.0 - x2 / 42.0)));
+  };
+
+  func _cos(x : Float) : Float {
+    let x2 = x * x;
+    1.0 - x2 / 2.0 * (1.0 - x2 / 12.0 * (1.0 - x2 / 30.0));
+  };
+
+  func _sqrt(x : Float) : Float {
+    if (x <= 0.0) return 0.0;
+    var guess = x / 2.0;
+    var i = 0;
+    while (i < 20) {
+      guess := (guess + x / guess) / 2.0;
+      i += 1;
+    };
+    guess;
+  };
+
+  func _atan2(y : Float, x : Float) : Float {
+    // atan2 approximation: atan(y/x) with quadrant handling
+    if (x == 0.0) {
+      if (y > 0.0) return 1.5707963267948966;
+      if (y < 0.0) return -1.5707963267948966;
+      return 0.0;
+    };
+    let r = y / x;
+    let atan = r / (1.0 + 0.28125 * r * r); // fast atan approx
+    if (x > 0.0) return atan;
+    if (y >= 0.0) return atan + 3.14159265358979;
+    atan - 3.14159265358979;
+  };
+
+  // listPublicMoments: search public moments with optional date range for recurrence expansion.
+  // dateRangeStart / dateRangeEnd: when provided, recurring moments are expanded into their
+  // occurrences within the range. Non-recurring moments are included if their eventDate falls
+  // within the range (or always if no range filter is given).
+  public func listPublicMoments(
+    state : MomentsState,
+    searchText : ?Text,
+    filterTags : [Text],
+    dateRangeStart : ?Common.Timestamp,
+    dateRangeEnd : ?Common.Timestamp,
+    locationLat : ?Float,
+    locationLng : ?Float,
+    radiusKm : ?Float,
+    offset : Nat,
+    limit : Nat
+  ) : [T.MomentListItem] {
     let results = List.empty<T.MomentListItem>();
+
+    let searchLower : ?Text = switch (searchText) {
+      case null null;
+      case (?s) if (s == "") null else ?s.toLower();
+    };
+
     state.moments.forEach(func(_, m) {
-      if (m.visibility == #public_) {
-        // Text search filter
-        let passesText = switch (searchText) {
-          case null true;
-          case (?q) {
-            let lower = q.toLower();
-            m.title.toLower().contains(#text lower) or
-            m.description.toLower().contains(#text lower) or
-            m.location.toLower().contains(#text lower);
+      if (m.visibility != #public_) return;
+
+      // Text search filter
+      switch (searchLower) {
+        case (?q) {
+          let titleMatch = m.title.toLower().contains(#text q);
+          let descMatch = m.description.toLower().contains(#text q);
+          let tagMatch = m.tags.any(func(t : Text) : Bool { t.toLower().contains(#text q) });
+          if (not titleMatch and not descMatch and not tagMatch) return;
+        };
+        case null {};
+      };
+
+      // Tag filter
+      if (filterTags.size() > 0) {
+        let hasAllTags = filterTags.all(func(ft : Text) : Bool {
+          m.tags.any(func(t : Text) : Bool { t.toLower() == ft.toLower() })
+        });
+        if (not hasAllTags) return;
+      };
+
+      // Location filter (near me)
+      switch (locationLat, locationLng, radiusKm) {
+        case (?lat, ?lng, ?radius) {
+          switch (m.locationLat, m.locationLng) {
+            case (?mLat, ?mLng) {
+              let dist = _distanceKm(lat, lng, mLat, mLng);
+              if (dist > radius) return;
+            };
+            case _ return; // no coordinates on moment — exclude from near-me filter
           };
         };
+        case _ {};
+      };
 
-        // Tag filter
-        let passesTags = if (filterTags.size() == 0) {
-          true
-        } else {
-          filterTags.any(func(tag : Text) : Bool {
-            m.tags.any(func(t : Text) : Bool { t == tag })
-          })
+      // Date range filter + recurrence expansion
+      switch (m.recurrence) {
+        case null {
+          // Non-recurring: include if eventDate is in range (or no range given)
+          switch (dateRangeStart, dateRangeEnd) {
+            case (?rs, ?re) {
+              if (m.eventDate < rs or m.eventDate > re) return;
+              results.add(_toListItem(state, m, null, null));
+            };
+            case (?rs, null) {
+              if (m.eventDate < rs) return;
+              results.add(_toListItem(state, m, null, null));
+            };
+            case (null, ?re) {
+              if (m.eventDate > re) return;
+              results.add(_toListItem(state, m, null, null));
+            };
+            case (null, null) {
+              results.add(_toListItem(state, m, null, null));
+            };
+          };
         };
-
-        if (passesText and passesTags) {
-          results.add(_toListItem(state, m, null));
+        case (?_) {
+          // Recurring: expand within the date range
+          switch (dateRangeStart, dateRangeEnd) {
+            case (?rs, ?re) {
+              let occurrences = expandRecurrenceInRange(m, rs, re);
+              if (occurrences.size() == 0) return;
+              // Return one item per occurrence
+              for (occTs in occurrences.values()) {
+                results.add(_toListItem(state, m, null, ?occTs));
+              };
+            };
+            case _ {
+              // No range — just show the moment itself (base eventDate)
+              results.add(_toListItem(state, m, null, null));
+            };
+          };
         };
       };
     });
 
-    // Sort by eventDate descending (newest first)
+    // Sort by effective date descending
     results.sortInPlace(func(a : T.MomentListItem, b : T.MomentListItem) : { #less; #equal; #greater } {
-      Int.compare(b.eventDate, a.eventDate)
+      let dateA = switch (a.occurrenceDate) { case (?d) d; case null a.eventDate };
+      let dateB = switch (b.occurrenceDate) { case (?d) d; case null b.eventDate };
+      Int.compare(dateB, dateA)
     });
 
+    // Apply pagination
     let total = results.size();
-    let start = if (offset > total) total else offset;
-    let end_ = if (start + limit > total) total else start + limit;
-    results.sliceToArray(start, end_);
+    if (offset >= total) return [];
+    let end = Nat.min(offset + limit, total);
+    results.sliceToArray(offset, end);
   };
 
   // Returns moments owned by userId.
@@ -283,7 +497,7 @@ module {
     state.moments.forEach(func(_, m) {
       if (Principal.equal(m.owner, userId)) {
         if (isOwner or m.visibility == #public_) {
-          results.add(_toListItem(state, m, null));
+          results.add(_toListItem(state, m, null, null));
         };
       };
     });
@@ -293,35 +507,72 @@ module {
     results.toArray();
   };
 
-  public func listCalendarMomentsForUser(state : MomentsState, userId : Common.UserId) : [T.MomentListItem] {
+  // listCalendarMomentsForUser: returns all moments for the calendar view within a date range.
+  // Recurring moments are expanded into virtual occurrences within [rangeStart, rangeEnd].
+  // Each occurrence produces a separate MomentListItem with occurrenceDate set.
+  public func listCalendarMomentsForUser(
+    state : MomentsState,
+    userId : Common.UserId,
+    rangeStart : Common.Timestamp,
+    rangeEnd : Common.Timestamp
+  ) : [T.MomentListItem] {
     let results = List.empty<T.MomentListItem>();
-    let seen = Set.empty<Common.MomentId>();
 
-    // Add owned moments
-    state.moments.forEach(func(_, m) {
+    // Collect all moment IDs the user owns or attends/RSVP'd
+    let relevantMomentIds = Set.empty<Common.MomentId>();
+
+    state.moments.forEach(func(momentId, m) {
       if (Principal.equal(m.owner, userId)) {
-        results.add(_toListItem(state, m, ?#owned));
-        seen.add(m.id);
+        relevantMomentIds.add(momentId);
       };
     });
 
-    // Add moments where caller has an RSVP entry (attending/maybe/notAttending)
     state.attendees.forEach(func(key, att) {
-      let (mid, uid) = key;
-      if (Principal.equal(uid, userId) and not seen.contains(mid)) {
-        switch (state.moments.get(mid)) {
-          case (?m) {
-            results.add(_toListItem(state, m, ?#rsvp(att.rsvpStatus)));
-            seen.add(mid);
+      let (momentId, attendeeUserId) = key;
+      if (Principal.equal(attendeeUserId, userId)) {
+        relevantMomentIds.add(momentId);
+      };
+    });
+
+    relevantMomentIds.forEach(func(momentId) {
+      switch (state.moments.get(momentId)) {
+        case null {};
+        case (?m) {
+          let isOwner = Principal.equal(m.owner, userId);
+          let relation : T.CallerRelation = if (isOwner) {
+            #owned
+          } else {
+            switch (state.attendees.get(_pairCompare, (momentId, userId))) {
+              case (?att) #rsvp(att.rsvpStatus);
+              case null #following;
+            };
           };
-          case null {};
+
+          switch (m.recurrence) {
+            case null {
+              // Non-recurring: include if eventDate overlaps the range
+              if (m.eventDate >= rangeStart and m.eventDate <= rangeEnd) {
+                results.add(_toListItem(state, m, ?relation, null));
+              };
+            };
+            case (?_) {
+              // Recurring: expand into occurrences within the range
+              let occurrences = expandRecurrenceInRange(m, rangeStart, rangeEnd);
+              for (occTs in occurrences.values()) {
+                results.add(_toListItem(state, m, ?relation, ?occTs));
+              };
+            };
+          };
         };
       };
     });
 
     results.sortInPlace(func(a : T.MomentListItem, b : T.MomentListItem) : { #less; #equal; #greater } {
-      Int.compare(b.eventDate, a.eventDate)
+      let dateA = switch (a.occurrenceDate) { case (?d) d; case null a.eventDate };
+      let dateB = switch (b.occurrenceDate) { case (?d) d; case null b.eventDate };
+      Int.compare(dateA, dateB)
     });
+
     results.toArray();
   };
 
@@ -333,7 +584,7 @@ module {
           Principal.equal(uid, m.owner)
         });
         if (ownerIsFollowed) {
-          results.add(_toListItem(state, m, ?#following));
+          results.add(_toListItem(state, m, ?#following, null));
         };
       };
     });
@@ -384,6 +635,7 @@ module {
           attendeeCount = _attendeeCount(state, momentId);
           callerAccessStatus = callerAccessStatus;
           isOwner = isOwner;
+          recurrence = m.recurrence;
         };
       };
     };
@@ -619,16 +871,49 @@ module {
   };
 
   // ── Admin helpers ─────────────────────────────────────────────────────────
-  public func adminBulkImport(state : MomentsState, owner : Common.UserId, rows : [T.BulkImportMomentRow]) : T.BulkImportResult {
-    var successCount = 0;
-    let errors = List.empty<{ row : Nat; message : Text }>();
 
-    let rowList = List.fromArray<T.BulkImportMomentRow>(rows);
-    rowList.forEachEntry(func(idx : Nat, row : T.BulkImportMomentRow) {
-      if (row.title.size() == 0) {
-        errors.add({ row = idx; message = "Missing required field: title" });
+  // adminBulkImport: creates moments from a list of CSV rows.
+  // When a row has coverImageUrl set, the caller (mixin) is responsible for
+  // fetching the image via http-outcall and passing the result as coverImageBlob.
+  // This function is synchronous — image fetching happens in the mixin layer (async).
+  // coverImageBlobs: parallel array of ?Blob (null if fetch failed or no URL provided)
+  public func adminBulkImport(
+    state : MomentsState,
+    owner : Common.UserId,
+    rows : [T.BulkImportMomentRow],
+    coverImageBlobs : [?Blob]
+  ) : T.BulkImportResult {
+    let errors = List.empty<{ row : Nat; message : Text }>();
+    let warnings = List.empty<{ row : Nat; message : Text }>();
+    var successCount = 0;
+
+    for (i in rows.keys()) {
+      let row = rows[i];
+
+      // Validate required fields
+      if (row.title == "") {
+        errors.add({ row = i + 1; message = "Missing required field: title" });
+        // continue via label
       } else {
-        let vis : T.Visibility = if (row.visibility == "private") #private_ else #public_;
+        let visibility : T.Visibility = if (row.visibility == "private") #private_ else #public_;
+
+        let coverImageBlob : ?Blob = if (i < coverImageBlobs.size()) coverImageBlobs[i] else null;
+
+        // Warn if coverImageUrl was provided but blob is null (fetch failed)
+        switch (row.coverImageUrl) {
+          case (?url) {
+            if (url != "") {
+              switch (coverImageBlob) {
+                case null {
+                  warnings.add({ row = i + 1; message = "Cover image could not be fetched from: " # url });
+                };
+                case _ {};
+              };
+            };
+          };
+          case null {};
+        };
+
         let input : T.CreateMomentInput = {
           title = row.title;
           description = switch (row.description) { case (?d) d; case null "" };
@@ -637,21 +922,27 @@ module {
           locationLng = row.locationLng;
           eventDate = row.startDate;
           tags = row.tags;
-          coverImage = null;
-          visibility = vis;
+          coverImage = coverImageBlob;
+          visibility;
+          recurrence = null;
         };
+
         ignore createMoment(state, owner, input);
         successCount += 1;
       };
-    });
+    };
 
-    { successCount; errors = errors.toArray() };
+    {
+      successCount;
+      errors = errors.toArray();
+      warnings = warnings.toArray();
+    };
   };
 
   public func adminListAllMoments(state : MomentsState) : [T.MomentListItem] {
     let results = List.empty<T.MomentListItem>();
     state.moments.forEach(func(_, m) {
-      results.add(_toListItem(state, m, null));
+      results.add(_toListItem(state, m, null, null));
     });
     results.sortInPlace(func(a : T.MomentListItem, b : T.MomentListItem) : { #less; #equal; #greater } {
       Int.compare(b.eventDate, a.eventDate)
@@ -661,5 +952,12 @@ module {
 
   public func adminDeleteMoment(state : MomentsState, momentId : Common.MomentId) : () {
     _removeMomentData(state, momentId);
+  };
+
+  public func adminDeleteAllMoments(state : MomentsState) : () {
+    state.moments.clear();
+    state.accessRequests.clear();
+    state.attendees.clear();
+    state.grantedAccess.clear();
   };
 };

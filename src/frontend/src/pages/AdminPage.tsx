@@ -25,6 +25,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { useCallback, useRef, useState } from "react";
 import { AuthGuard } from "../components/AuthGuard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -80,7 +81,7 @@ type ImportPhase =
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const MAX_CSV_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_CSV_BYTES = 10 * 1024 * 1024;
 
 function formatDate(ts: bigint) {
   return new Date(Number(ts / 1_000_000n)).toLocaleDateString("en-US", {
@@ -147,7 +148,7 @@ function StatusBadge({ status }: { status: AccessStatus }) {
   );
 }
 
-function StatCard({
+function GlassStatCard({
   icon: Icon,
   label,
   value,
@@ -157,9 +158,9 @@ function StatCard({
   value: number | undefined;
 }) {
   return (
-    <div className="card-elevated p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-        <Icon className="w-5 h-5 text-foreground" strokeWidth={1.5} />
+    <div className="glass-card rounded-2xl p-4 flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center flex-shrink-0">
+        <Icon className="w-5 h-5 text-accent" strokeWidth={1.5} />
       </div>
       <div className="min-w-0">
         <p className="font-display font-bold text-xl text-foreground leading-none">
@@ -204,11 +205,10 @@ function parseCsv(content: string): ParsedCsvRow[] {
   if (lines.length < 2) return [];
 
   const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().trim());
-
   const idx = (name: string) => headers.indexOf(name);
 
   return lines.slice(1).map((line, i) => {
-    const rowIndex = i + 2; // 1-indexed, skipping header row
+    const rowIndex = i + 2;
     const cols = parseCsvLine(line);
     const get = (name: string) => {
       const index = idx(name);
@@ -220,7 +220,6 @@ function parseCsv(content: string): ParsedCsvRow[] {
     const location = get("location");
     const locationLatRaw = get("locationlat");
     const locationLngRaw = get("locationlng");
-    // Accept both "startdate" and "eventdate" column names
     const startDate = get("startdate") || get("eventdate");
     const tags = get("tags");
     const coverImage = get("coverimage");
@@ -310,9 +309,7 @@ function CsvImportDialog({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setFileError(null);
-
     if (!file.name.endsWith(".csv")) {
       setFileError("Please select a .csv file.");
       return;
@@ -321,7 +318,6 @@ function CsvImportDialog({
       setFileError("File exceeds the 10 MB limit. Please use a smaller file.");
       return;
     }
-
     setPhase("validating");
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -346,7 +342,6 @@ function CsvImportDialog({
   const handleConfirmImport = async () => {
     setPhase("importing");
     setProgress({ current: 0, total: validRows.length });
-
     try {
       const results = await bulkImport.mutateAsync({
         rows: validRows.map((r) => r.data),
@@ -368,26 +363,31 @@ function CsvImportDialog({
 
   const successCount = importResults.filter((r) => r.success).length;
   const errorCount = importResults.filter((r) => !r.success).length;
+  const warningCount = importResults.filter(
+    (r) => r.success && r.warning,
+  ).length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md w-full" data-ocid="csv-import-dialog">
+      <DialogContent
+        className="max-w-md w-full glass-modal border-white/10"
+        data-ocid="csv-import-dialog"
+      >
         <DialogHeader>
           <DialogTitle className="font-display text-base flex items-center gap-2">
-            <Upload className="w-4 h-4" />
+            <Upload className="w-4 h-4 text-accent" />
             Import Moments from CSV
           </DialogTitle>
         </DialogHeader>
 
-        {/* ── Idle / File picker ── */}
+        {/* Idle / File picker */}
         {(phase === "idle" || phase === "validating") && (
           <div className="space-y-4">
             <p className="font-body text-sm text-muted-foreground">
               Upload a CSV file with moment data. Max file size: 10 MB.
             </p>
 
-            {/* Expected columns info */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-1.5">
+            <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-1.5">
               <p className="font-body text-xs font-medium text-foreground">
                 Expected columns
               </p>
@@ -416,7 +416,7 @@ function CsvImportDialog({
             </div>
 
             {fileError && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+              <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3">
                 <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
                 <p className="font-body text-xs text-destructive">
                   {fileError}
@@ -426,13 +426,10 @@ function CsvImportDialog({
 
             <label
               htmlFor="csv-file-input"
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors p-6"
+              className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-accent/30 hover:border-accent/60 bg-accent/5 hover:bg-accent/10 cursor-pointer transition-smooth p-6"
               data-ocid="csv-file-drop-zone"
             >
-              <Upload
-                className="w-6 h-6 text-muted-foreground"
-                strokeWidth={1.5}
-              />
+              <Upload className="w-6 h-6 text-accent" strokeWidth={1.5} />
               <div className="text-center">
                 <p className="font-body text-sm font-medium text-foreground">
                   Click to select CSV file
@@ -454,12 +451,11 @@ function CsvImportDialog({
           </div>
         )}
 
-        {/* ── Validation summary ── */}
+        {/* Validation summary */}
         {phase === "selecting" && (
           <div className="space-y-3">
-            {/* Summary row */}
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+              <div className="rounded-xl border border-[oklch(var(--success)/0.3)] bg-[oklch(var(--success)/0.05)] p-3 text-center">
                 <p className="font-display font-bold text-2xl text-foreground">
                   {validRows.length}
                 </p>
@@ -468,7 +464,7 @@ function CsvImportDialog({
                 </p>
               </div>
               <div
-                className={`rounded-lg border p-3 text-center ${
+                className={`rounded-xl border p-3 text-center ${
                   invalidRows.length > 0
                     ? "border-destructive/30 bg-destructive/5"
                     : "border-border bg-muted/30"
@@ -489,9 +485,8 @@ function CsvImportDialog({
               </div>
             </div>
 
-            {/* Error detail list */}
             {invalidRows.length > 0 && (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 divide-y divide-destructive/10 max-h-44 overflow-y-auto">
+              <div className="rounded-xl border border-destructive/20 bg-destructive/5 divide-y divide-destructive/10 max-h-44 overflow-y-auto">
                 {invalidRows.map((r) => (
                   <div
                     key={r.rowIndex}
@@ -516,39 +511,39 @@ function CsvImportDialog({
                 No valid rows to import. Fix the errors above and re-upload.
               </p>
             )}
-
             {validRows.length > 0 && (
               <p className="font-body text-sm text-muted-foreground">
                 {invalidRows.length > 0
-                  ? `Only the ${validRows.length} valid row${validRows.length !== 1 ? "s" : ""} will be imported. Rows with errors will be skipped.`
-                  : `All ${validRows.length} row${validRows.length !== 1 ? "s" : ""} passed validation and are ready to import.`}
+                  ? `Only the ${validRows.length} valid row${validRows.length !== 1 ? "s" : ""} will be imported.`
+                  : `All ${validRows.length} row${validRows.length !== 1 ? "s" : ""} passed validation.`}
               </p>
             )}
           </div>
         )}
 
-        {/* ── Importing progress ── */}
+        {/* Importing progress */}
         {phase === "importing" && (
           <div className="space-y-4 py-2">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-accent/15 flex items-center justify-center">
                 <Upload
-                  className="w-6 h-6 text-primary animate-pulse"
+                  className="w-6 h-6 text-accent animate-pulse"
                   strokeWidth={1.5}
                 />
               </div>
               <p className="font-body text-sm font-medium text-foreground">
                 Importing row {progress.current} of {progress.total}…
               </p>
-              {/* Progress bar */}
               <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all duration-200"
+                  className="h-full rounded-full transition-all duration-200"
                   style={{
                     width:
                       progress.total > 0
                         ? `${(progress.current / progress.total) * 100}%`
                         : "0%",
+                    background:
+                      "linear-gradient(90deg, oklch(0.65 0.25 280), oklch(0.72 0.28 300))",
                   }}
                 />
               </div>
@@ -559,11 +554,11 @@ function CsvImportDialog({
           </div>
         )}
 
-        {/* ── Done / Results ── */}
+        {/* Done / Results */}
         {phase === "done" && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+              <div className="rounded-xl border border-[oklch(var(--success)/0.3)] bg-[oklch(var(--success)/0.05)] p-3 text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-1">
                   <CheckCircle2 className="w-4 h-4 text-[oklch(var(--success))]" />
                 </div>
@@ -575,7 +570,7 @@ function CsvImportDialog({
                 </p>
               </div>
               <div
-                className={`rounded-lg border p-3 text-center ${
+                className={`rounded-xl border p-3 text-center ${
                   errorCount > 0
                     ? "border-destructive/30 bg-destructive/5"
                     : "border-border bg-muted/30"
@@ -587,9 +582,7 @@ function CsvImportDialog({
                   </div>
                 )}
                 <p
-                  className={`font-display font-bold text-2xl ${
-                    errorCount > 0 ? "text-destructive" : "text-foreground"
-                  }`}
+                  className={`font-display font-bold text-2xl ${errorCount > 0 ? "text-destructive" : "text-foreground"}`}
                 >
                   {errorCount}
                 </p>
@@ -600,7 +593,7 @@ function CsvImportDialog({
             </div>
 
             {errorCount > 0 && (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 divide-y divide-destructive/10 max-h-40 overflow-y-auto">
+              <div className="rounded-xl border border-destructive/20 bg-destructive/5 divide-y divide-destructive/10 max-h-40 overflow-y-auto">
                 {importResults
                   .filter((r) => !r.success)
                   .map((r) => (
@@ -615,6 +608,29 @@ function CsvImportDialog({
                         </span>
                         <span className="font-body text-[11px] text-muted-foreground ml-1 truncate block">
                           {r.title}: {r.error ?? "Unknown error"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {warningCount > 0 && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 divide-y divide-amber-500/10 max-h-40 overflow-y-auto">
+                {importResults
+                  .filter((r) => r.success && r.warning)
+                  .map((r) => (
+                    <div
+                      key={r.rowIndex}
+                      className="p-2.5 flex items-start gap-2"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <span className="font-mono text-[11px] font-medium text-amber-700">
+                          Warning on row {r.rowIndex + 2}
+                        </span>
+                        <span className="font-body text-[11px] text-muted-foreground ml-1 truncate block">
+                          {r.title}: {r.warning}
                         </span>
                       </div>
                     </div>
@@ -646,6 +662,11 @@ function CsvImportDialog({
                 onClick={handleConfirmImport}
                 disabled={validRows.length === 0}
                 data-ocid="csv-import-confirm-btn"
+                className="text-white"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.65 0.25 280), oklch(0.55 0.28 290))",
+                }}
               >
                 Import {validRows.length} moment
                 {validRows.length !== 1 ? "s" : ""}
@@ -676,6 +697,7 @@ export function AdminPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -763,6 +785,21 @@ export function AdminPage() {
     onError: () => showError("Delete failed. Please try again."),
   });
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Not connected");
+      await actor.adminDeleteAllMoments();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.adminMoments,
+      });
+      showSuccess("All moments deleted.");
+      setDeleteAllOpen(false);
+    },
+    onError: () => showError("Failed to delete all moments."),
+  });
+
   const resolveMutation = useMutation({
     mutationFn: async ({
       momentId,
@@ -792,11 +829,8 @@ export function AdminPage() {
       <AuthGuard requireAuth currentPath="/admin">
         <Layout>
           <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <Shield
-                className="w-8 h-8 text-muted-foreground"
-                strokeWidth={1.5}
-              />
+            <div className="w-16 h-16 rounded-full glass-card flex items-center justify-center">
+              <Shield className="w-8 h-8 text-accent" strokeWidth={1.5} />
             </div>
             <p className="font-display font-semibold text-lg text-foreground">
               Admin access required
@@ -824,26 +858,38 @@ export function AdminPage() {
       <Layout>
         <div className="py-6 space-y-6 max-w-2xl mx-auto">
           {/* Header */}
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-foreground" strokeWidth={1.5} />
-            <h1 className="font-display font-bold text-2xl text-foreground">
-              Admin
-            </h1>
-          </div>
+          <motion.div
+            className="flex items-center gap-3"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-accent" strokeWidth={1.5} />
+            </div>
+            <div>
+              <h1 className="font-display font-bold text-2xl text-gradient-accent leading-tight">
+                Admin Dashboard
+              </h1>
+              <p className="font-body text-xs text-muted-foreground">
+                Manage users, moments, and media
+              </p>
+            </div>
+          </motion.div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3" data-ocid="admin-stats">
-            <StatCard
+            <GlassStatCard
               icon={Users}
               label="Users"
               value={usersQuery.data?.length}
             />
-            <StatCard
+            <GlassStatCard
               icon={Layers}
               label="Moments"
               value={momentsQuery.data?.length}
             />
-            <StatCard
+            <GlassStatCard
               icon={Image}
               label="Media"
               value={mediaQuery.data?.length}
@@ -852,20 +898,35 @@ export function AdminPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="users">
-            <TabsList className="w-full" data-ocid="admin-tabs">
-              <TabsTrigger value="users" className="flex-1 gap-1 text-xs">
+            <TabsList
+              className="w-full glass-card rounded-2xl p-1 h-auto border-white/10"
+              data-ocid="admin-tabs"
+            >
+              <TabsTrigger
+                value="users"
+                className="flex-1 gap-1 text-xs rounded-xl data-[state=active]:bg-accent/20 data-[state=active]:text-accent data-[state=active]:shadow-none transition-all"
+              >
                 <Users className="w-3.5 h-3.5" />
                 Users
               </TabsTrigger>
-              <TabsTrigger value="moments" className="flex-1 gap-1 text-xs">
+              <TabsTrigger
+                value="moments"
+                className="flex-1 gap-1 text-xs rounded-xl data-[state=active]:bg-accent/20 data-[state=active]:text-accent data-[state=active]:shadow-none transition-all"
+              >
                 <Layers className="w-3.5 h-3.5" />
                 Moments
               </TabsTrigger>
-              <TabsTrigger value="media" className="flex-1 gap-1 text-xs">
+              <TabsTrigger
+                value="media"
+                className="flex-1 gap-1 text-xs rounded-xl data-[state=active]:bg-accent/20 data-[state=active]:text-accent data-[state=active]:shadow-none transition-all"
+              >
                 <Image className="w-3.5 h-3.5" />
                 Media
               </TabsTrigger>
-              <TabsTrigger value="requests" className="flex-1 gap-1 text-xs">
+              <TabsTrigger
+                value="requests"
+                className="flex-1 gap-1 text-xs rounded-xl data-[state=active]:bg-accent/20 data-[state=active]:text-accent data-[state=active]:shadow-none transition-all"
+              >
                 <FileText className="w-3.5 h-3.5" />
                 Requests
               </TabsTrigger>
@@ -882,10 +943,14 @@ export function AdminPage() {
               ) : usersQuery.data?.length === 0 ? (
                 <EmptyState icon={Users} title="No users yet" />
               ) : (
-                usersQuery.data?.map((user) => (
-                  <div
+                usersQuery.data?.map((user, idx) => (
+                  <motion.div
                     key={user.id.toText()}
-                    className="card-elevated p-3 flex items-center justify-between gap-3"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04 }}
+                    className="glass-card rounded-xl p-3 flex items-center justify-between gap-3"
+                    data-ocid={`admin-users-tab.item.${idx + 1}`}
                   >
                     <button
                       type="button"
@@ -902,7 +967,7 @@ export function AdminPage() {
                         {user.photo && (
                           <AvatarImage src={user.photo.getDirectURL()} />
                         )}
-                        <AvatarFallback className="text-xs font-display font-semibold bg-secondary text-secondary-foreground">
+                        <AvatarFallback className="text-xs font-display font-semibold bg-accent/20 text-accent">
                           {user.username.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -918,7 +983,7 @@ export function AdminPage() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
                       onClick={() =>
                         setDeleteTarget({
                           type: "user",
@@ -931,7 +996,7 @@ export function AdminPage() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  </div>
+                  </motion.div>
                 ))
               )}
             </TabsContent>
@@ -943,13 +1008,30 @@ export function AdminPage() {
               data-ocid="admin-moments-tab"
             >
               {/* Toolbar */}
-              <div className="flex items-center justify-end">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteAllOpen(true)}
+                  data-ocid="admin-delete-all-moments-btn"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-body font-medium text-white transition-smooth hover:opacity-90"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.54 0.18 22), oklch(0.48 0.22 15))",
+                    boxShadow: "0 0 12px oklch(0.54 0.18 22 / 0.3)",
+                  }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete All
+                </button>
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs"
                   onClick={() => setCsvImportOpen(true)}
                   data-ocid="admin-import-csv-btn"
+                  className="gap-1.5 text-xs rounded-xl text-white"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.65 0.25 280), oklch(0.55 0.28 290))",
+                  }}
                 >
                   <Upload className="w-3.5 h-3.5" />
                   Import CSV
@@ -961,10 +1043,14 @@ export function AdminPage() {
               ) : momentsQuery.data?.length === 0 ? (
                 <EmptyState icon={Layers} title="No moments yet" />
               ) : (
-                momentsQuery.data?.map((moment) => (
-                  <div
+                momentsQuery.data?.map((moment, idx) => (
+                  <motion.div
                     key={moment.id.toString()}
-                    className="card-elevated p-3 flex items-center justify-between gap-3"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04 }}
+                    className="glass-card rounded-xl p-3 flex items-center justify-between gap-3"
+                    data-ocid={`admin-moments-tab.item.${idx + 1}`}
                   >
                     <button
                       type="button"
@@ -977,7 +1063,7 @@ export function AdminPage() {
                       }
                       data-ocid="admin-moment-row"
                     >
-                      <div className="w-10 h-10 rounded-md bg-muted flex-shrink-0 overflow-hidden">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
                         {moment.coverImage ? (
                           <img
                             src={moment.coverImage.getDirectURL()}
@@ -1011,7 +1097,7 @@ export function AdminPage() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
                       onClick={() =>
                         setDeleteTarget({
                           type: "moment",
@@ -1024,7 +1110,7 @@ export function AdminPage() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  </div>
+                  </motion.div>
                 ))
               )}
             </TabsContent>
@@ -1040,19 +1126,22 @@ export function AdminPage() {
               ) : mediaQuery.data?.length === 0 ? (
                 <EmptyState icon={Image} title="No media yet" />
               ) : (
-                mediaQuery.data?.map((item) => {
+                mediaQuery.data?.map((item, idx) => {
                   const moment = momentsQuery.data?.find(
                     (m) => m.id === item.momentId,
                   );
                   const uploader = userMap.get(item.uploadedBy.toText());
                   return (
-                    <div
+                    <motion.div
                       key={item.id.toString()}
-                      className="card-elevated p-3 flex items-center justify-between gap-3"
-                      data-ocid="admin-media-row"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.04 }}
+                      className="glass-card rounded-xl p-3 flex items-center justify-between gap-3"
+                      data-ocid={`admin-media-tab.item.${idx + 1}`}
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-md bg-muted flex-shrink-0 overflow-hidden">
+                        <div className="w-10 h-10 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
                           {item.kind === MediaKind.image ? (
                             <img
                               src={item.blob.getDirectURL()}
@@ -1085,7 +1174,7 @@ export function AdminPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
                         onClick={() =>
                           setDeleteTarget({
                             type: "media",
@@ -1098,7 +1187,7 @@ export function AdminPage() {
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
+                    </motion.div>
                   );
                 })
               )}
@@ -1120,9 +1209,12 @@ export function AdminPage() {
                 />
               ) : (
                 accessRequestsQuery.data?.map((req, i) => (
-                  <div
+                  <motion.div
                     key={`${req.requester.toText()}-${req.momentId.toString()}-${i}`}
-                    className="card-elevated p-3 space-y-2"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    className="glass-card rounded-xl p-3 space-y-2"
                     data-ocid="admin-request-row"
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -1142,7 +1234,7 @@ export function AdminPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="w-8 h-8 text-[oklch(var(--success))] hover:bg-[oklch(var(--success)/0.1)]"
+                            className="w-8 h-8 text-[oklch(var(--success))] hover:bg-[oklch(var(--success)/0.1)] rounded-xl"
                             onClick={() =>
                               resolveMutation.mutate({
                                 momentId: req.momentId,
@@ -1158,7 +1250,7 @@ export function AdminPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="w-8 h-8 text-destructive hover:bg-destructive/10"
+                            className="w-8 h-8 text-destructive hover:bg-destructive/10 rounded-xl"
                             onClick={() =>
                               resolveMutation.mutate({
                                 momentId: req.momentId,
@@ -1174,7 +1266,7 @@ export function AdminPage() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 ))
               )}
             </TabsContent>
@@ -1194,6 +1286,19 @@ export function AdminPage() {
           destructive
         />
 
+        {/* Delete All Moments Confirmation */}
+        <ConfirmDialog
+          open={deleteAllOpen}
+          onOpenChange={(open) => {
+            if (!open) setDeleteAllOpen(false);
+          }}
+          title="Delete all moments?"
+          description="This will permanently delete every moment in the app. This action cannot be undone."
+          confirmLabel="Delete All"
+          onConfirm={() => deleteAllMutation.mutate()}
+          destructive
+        />
+
         {/* CSV Import Dialog */}
         <CsvImportDialog open={csvImportOpen} onOpenChange={setCsvImportOpen} />
       </Layout>
@@ -1207,7 +1312,7 @@ function LoadingRows() {
   return (
     <div className="space-y-2">
       {[1, 2, 3, 4].map((i) => (
-        <Skeleton key={i} className="h-16 rounded-lg" />
+        <Skeleton key={i} className="h-16 rounded-xl" />
       ))}
     </div>
   );

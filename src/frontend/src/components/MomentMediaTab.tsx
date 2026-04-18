@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -29,7 +28,6 @@ import { MediaCard } from "./MediaCard";
 import { MediaDetailModal } from "./MediaDetailModal";
 
 const PAGE_SIZE = 12n;
-
 const ACCEPT_ALL =
   "image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt";
 
@@ -40,7 +38,6 @@ function detectKind(file: File): MediaKind {
   return MediaKind.document_;
 }
 
-// Max file size: 50 MB for media, 10 MB for documents
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
 
@@ -77,16 +74,13 @@ function FolderPill({
         type="button"
         data-ocid="folder-pill"
         onClick={onClick}
-        className={`
-          flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-body font-medium
-          transition-smooth tap-target border
-          ${
-            selected
-              ? "bg-foreground text-background border-foreground"
-              : "bg-card text-foreground border-border hover:bg-muted"
-          }
-          ${isOwner && !folder.isDefault ? "pr-2" : ""}
-        `}
+        className={[
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-body font-medium transition-smooth button-spring tap-target",
+          selected
+            ? "bg-accent text-accent-foreground glow-accent-sm"
+            : "glass-card text-foreground hover:opacity-80",
+          isOwner && !folder.isDefault ? "pr-2" : "",
+        ].join(" ")}
       >
         <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="max-w-[120px] truncate">{folder.name}</span>
@@ -105,18 +99,13 @@ function FolderPill({
                 setMenuOpen((v) => !v);
               }
             }}
-            className={`
-              ml-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0
-              transition-colors hover:bg-muted/60
-              ${selected ? "text-background/70 hover:bg-background/20" : "text-muted-foreground"}
-            `}
+            className="ml-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-white/20"
           >
             <MoreHorizontal className="w-3 h-3" />
           </button>
         )}
       </button>
 
-      {/* Dropdown menu */}
       {menuOpen && (
         <>
           <div
@@ -128,7 +117,7 @@ function FolderPill({
               if (e.key === "Escape") setMenuOpen(false);
             }}
           />
-          <div className="absolute top-full left-0 mt-1 z-20 bg-card border border-border rounded-lg shadow-lg min-w-[140px] overflow-hidden">
+          <div className="absolute top-full left-0 mt-1 z-20 glass-modal rounded-xl overflow-hidden min-w-[140px] shadow-xl animate-scale-in">
             <button
               type="button"
               data-ocid="delete-folder-menu-btn"
@@ -136,7 +125,7 @@ function FolderPill({
                 setMenuOpen(false);
                 onDelete(folder);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-body text-destructive hover:bg-destructive/10 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-body text-destructive hover:bg-destructive/15 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5 flex-shrink-0" />
               Delete folder
@@ -151,9 +140,16 @@ function FolderPill({
 interface MomentMediaTabProps {
   momentId: MomentId;
   isOwner: boolean;
+  isAttending?: boolean;
+  currentUserId?: string | null;
 }
 
-export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
+export function MomentMediaTab({
+  momentId,
+  isOwner,
+  isAttending = false,
+  currentUserId = null,
+}: MomentMediaTabProps) {
   const { actor } = useBackend();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -170,12 +166,9 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<Folder | null>(
     null,
   );
-
-  // Create folder state
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
-  // Fetch folders
   const { data: folders = [] } = useQuery<Folder[]>({
     queryKey: QUERY_KEYS.folders(momentId.toString()),
     queryFn: async () => {
@@ -185,7 +178,26 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
     enabled: !!actor,
   });
 
-  // Create folder mutation
+  // Determine current folder context
+  const currentFolder = selectedFolderId
+    ? (folders.find((f) => f.id === selectedFolderId) ?? null)
+    : (folders.find((f) => f.isDefault) ?? null);
+  const isCurrentFolderDefault =
+    currentFolder?.isDefault ?? selectedFolderId === null;
+
+  // Upload is allowed for: owner always, attending users only in the default folder
+  const canUpload = isOwner || (isAttending && isCurrentFolderDefault);
+
+  // Whether a media item's delete button should show:
+  // - Owner can delete anything
+  // - Media uploader can delete their own media only in the default folder
+  function canDeleteMedia(media: Media): boolean {
+    if (isOwner) return true;
+    if (!currentUserId) return false;
+    if (!isCurrentFolderDefault) return false;
+    return media.uploadedBy.toText() === currentUserId;
+  }
+
   const createFolderMutation = useMutation({
     mutationFn: async (name: string) => {
       if (!actor) throw new Error("Not connected");
@@ -202,7 +214,6 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
     onError: () => showError("Failed to create folder."),
   });
 
-  // Delete folder mutation
   const deleteFolderMutation = useMutation({
     mutationFn: async (folderId: bigint) => {
       if (!actor) throw new Error("Not connected");
@@ -211,7 +222,6 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
     onSuccess: async () => {
       showSuccess("Folder deleted.");
       setDeleteFolderTarget(null);
-      // If the deleted folder was selected, go back to "All"
       if (deleteFolderTarget && selectedFolderId === deleteFolderTarget.id) {
         setSelectedFolderId(null);
       }
@@ -225,7 +235,6 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
     onError: () => showError("Failed to delete folder."),
   });
 
-  // Infinite query for all media in moment
   const allMediaQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.media(momentId.toString(), 0),
     queryFn: async ({ pageParam = 0n }) => {
@@ -237,7 +246,6 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
     enabled: !!actor && selectedFolderId === null,
   });
 
-  // Infinite query for media in selected folder
   const folderMediaQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.mediaByFolder(selectedFolderId?.toString() ?? "", 0),
     queryFn: async ({ pageParam = 0n }) => {
@@ -263,7 +271,6 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
   const handleUpload = useCallback(
     async (file: File) => {
       if (!actor) return;
-
       const sizeError = validateFileSize(file);
       if (sizeError) {
         showError(sizeError);
@@ -285,7 +292,6 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
         const blob = ExternalBlob.fromBytes(bytes).withUploadProgress((pct) => {
           setUploadProgress(pct);
         });
-
         await actor.uploadMedia({
           blob,
           kind: detectKind(file),
@@ -293,7 +299,6 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
           filename: file.name,
           folderId: targetFolderId,
         });
-
         showSuccess("Media uploaded successfully.");
         await queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.media(momentId.toString(), 0),
@@ -355,21 +360,17 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
           type="button"
           data-ocid="folder-pill-all"
           onClick={() => setSelectedFolderId(null)}
-          className={`
-            flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-body font-medium
-            transition-smooth tap-target border
-            ${
-              selectedFolderId === null
-                ? "bg-foreground text-background border-foreground"
-                : "bg-card text-foreground border-border hover:bg-muted"
-            }
-          `}
+          className={[
+            "flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-body font-medium transition-smooth button-spring tap-target",
+            selectedFolderId === null
+              ? "bg-accent text-accent-foreground glow-accent-sm"
+              : "glass-card text-foreground hover:opacity-80",
+          ].join(" ")}
         >
           <Images className="w-3.5 h-3.5" />
           All
         </button>
 
-        {/* Folder pills */}
         {folders.map((f) => (
           <FolderPill
             key={f.id.toString()}
@@ -381,14 +382,13 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
           />
         ))}
 
-        {/* Add folder button — owner only */}
         {isOwner && !showCreateFolder && (
           <button
             type="button"
             data-ocid="add-folder-pill-btn"
             onClick={() => setShowCreateFolder(true)}
             aria-label="Create folder"
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-body font-medium border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-smooth tap-target"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-body font-medium border border-dashed border-accent/30 text-muted-foreground hover:text-accent hover:border-accent/60 transition-smooth button-spring tap-target"
           >
             <FolderPlus className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">New folder</span>
@@ -401,9 +401,9 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
         <form
           data-ocid="create-folder-form"
           onSubmit={handleCreateFolderSubmit}
-          className="flex items-center gap-2 p-3 rounded-xl border border-border bg-muted/30"
+          className="glass-card rounded-2xl flex items-center gap-2 p-3 animate-slide-down"
         >
-          <FolderPlus className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <FolderPlus className="w-4 h-4 text-accent flex-shrink-0" />
           <Input
             autoFocus
             placeholder="Folder name"
@@ -419,15 +419,14 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
             className="flex-1 h-8 text-sm font-body bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 placeholder:text-muted-foreground"
             data-ocid="folder-name-input"
           />
-          <Button
+          <button
             type="submit"
-            size="sm"
             disabled={!newFolderName.trim() || createFolderMutation.isPending}
-            className="h-7 text-xs tap-target"
+            className="px-3 py-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-body font-semibold hover:opacity-90 transition-smooth button-spring disabled:opacity-50 min-h-0"
             data-ocid="create-folder-submit"
           >
             {createFolderMutation.isPending ? "Creating…" : "Create"}
-          </Button>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -435,16 +434,16 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
               setNewFolderName("");
             }}
             aria-label="Cancel"
-            className="w-6 h-6 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
+            className="w-7 h-7 rounded-full glass-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </form>
       )}
 
-      {/* Upload bar */}
-      {isOwner && (
-        <div className="flex items-center gap-3">
+      {/* Upload zone — owner always, attending users only in default folder */}
+      {canUpload && (
+        <div>
           <input
             ref={fileInputRef}
             type="file"
@@ -452,48 +451,58 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
             className="hidden"
             onChange={handleFileChange}
           />
-          <Button
+          <button
+            type="button"
             data-ocid="upload-media-btn"
-            variant="outline"
-            size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="gap-2 tap-target"
+            className="w-full glass-card rounded-2xl border-2 border-dashed border-accent/25 hover:border-accent/50 flex flex-col items-center gap-3 py-7 transition-smooth group disabled:opacity-60"
           >
             {isUploading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <>
+                <Loader2 className="w-7 h-7 text-accent animate-spin" />
+                <span className="text-sm font-body text-muted-foreground">
+                  {uploadProgress !== null
+                    ? `Uploading ${Math.round(uploadProgress)}%`
+                    : "Uploading…"}
+                </span>
+                {uploadProgress !== null && (
+                  <div className="w-32 h-1 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-accent transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                )}
+              </>
             ) : (
-              <Upload className="w-4 h-4" />
+              <>
+                <div className="w-12 h-12 rounded-2xl glass-card glow-accent-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Upload className="w-5 h-5 text-accent" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-body font-semibold text-foreground">
+                    Upload Media
+                  </p>
+                  <p className="text-xs text-muted-foreground font-body mt-0.5">
+                    Photos, videos &amp; audio up to 50 MB · Documents up to 10
+                    MB
+                  </p>
+                </div>
+              </>
             )}
-            {isUploading
-              ? uploadProgress !== null
-                ? `Uploading ${Math.round(uploadProgress)}%`
-                : "Uploading…"
-              : "Upload Media"}
-          </Button>
-          {isUploading && uploadProgress !== null && (
-            <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-foreground transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-          )}
+          </button>
         </div>
-      )}
-
-      {/* File size note */}
-      {isOwner && (
-        <p className="text-xs text-muted-foreground font-body -mt-1">
-          Photos, videos &amp; audio up to 50 MB · Documents up to 10 MB
-        </p>
       )}
 
       {/* Media grid */}
       {isLoadingMedia ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {["a", "b", "c", "d", "e", "f"].map((id) => (
-            <Skeleton key={id} className="aspect-[4/3] rounded-lg" />
+            <Skeleton
+              key={id}
+              className="aspect-[4/3] rounded-xl animate-shimmer"
+            />
           ))}
         </div>
       ) : allItems.length === 0 ? (
@@ -501,21 +510,21 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
           icon={Images}
           title="No media yet"
           description={
-            isOwner
+            canUpload
               ? "Upload your first photo, video, or file to this moment."
               : "No media has been added to this moment yet."
           }
           action={
-            isOwner ? (
-              <Button
+            canUpload ? (
+              <button
+                type="button"
                 data-ocid="upload-media-empty-btn"
-                variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                className="gap-2 tap-target"
+                className="w-full flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-body font-semibold text-accent-foreground bg-accent glow-accent button-spring transition-smooth hover:opacity-90 min-h-12"
               >
                 <Upload className="w-4 h-4" />
                 Upload Media
-              </Button>
+              </button>
             ) : undefined
           }
         />
@@ -533,19 +542,18 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
 
           {hasMore && (
             <div className="flex justify-center pt-2">
-              <Button
+              <button
+                type="button"
                 data-ocid="load-more-btn"
-                variant="outline"
-                size="sm"
                 onClick={() => activeQuery.fetchNextPage()}
                 disabled={activeQuery.isFetchingNextPage}
-                className="gap-2 tap-target"
+                className="glass-card rounded-full px-6 py-2.5 text-sm font-body font-medium text-foreground flex items-center gap-2 hover:opacity-80 transition-smooth button-spring disabled:opacity-50"
               >
-                {activeQuery.isFetchingNextPage ? (
+                {activeQuery.isFetchingNextPage && (
                   <Loader2 className="w-4 h-4 animate-spin" />
-                ) : null}
+                )}
                 Load more
-              </Button>
+              </button>
             </div>
           )}
         </>
@@ -556,13 +564,13 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
         <MediaDetailModal
           media={selectedMedia}
           isOwner={isOwner}
+          canDelete={canDeleteMedia(selectedMedia)}
           folders={folders}
           onClose={() => setSelectedMedia(null)}
           onDelete={(m) => setDeleteMediaTarget(m)}
         />
       )}
 
-      {/* Delete media confirm */}
       <ConfirmDialog
         open={!!deleteMediaTarget}
         onOpenChange={(open) => !open && setDeleteMediaTarget(null)}
@@ -573,12 +581,11 @@ export function MomentMediaTab({ momentId, isOwner }: MomentMediaTabProps) {
         onConfirm={handleDeleteMedia}
       />
 
-      {/* Delete folder confirm */}
       <ConfirmDialog
         open={!!deleteFolderTarget}
         onOpenChange={(open) => !open && setDeleteFolderTarget(null)}
         title="Delete Folder"
-        description={`Delete "${deleteFolderTarget?.name}"? All media in this folder will be moved to the default folder.`}
+        description={`Delete "${deleteFolderTarget?.name}"? All media in this folder will be moved to the public folder.`}
         confirmLabel="Delete"
         destructive
         onConfirm={() => {

@@ -39,7 +39,7 @@ module {
     let folder : T.Folder = {
       id = folderId;
       momentId = momentId;
-      name = "Default";
+      name = "public";
       isDefault = true;
       createdAt = Time.now();
     };

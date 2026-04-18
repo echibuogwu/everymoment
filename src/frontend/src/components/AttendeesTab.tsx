@@ -1,6 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -23,13 +21,11 @@ const RSVP_LABELS: Record<RsvpStatus, string> = {
   [RsvpStatus.notAttending]: "Not Attending",
 };
 
-const RSVP_VARIANT: Record<
-  RsvpStatus,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  [RsvpStatus.attending]: "default",
-  [RsvpStatus.maybe]: "secondary",
-  [RsvpStatus.notAttending]: "destructive",
+// Glass pill color per RSVP status
+const RSVP_DOT: Record<RsvpStatus, string> = {
+  [RsvpStatus.attending]: "bg-accent",
+  [RsvpStatus.maybe]: "bg-yellow-400",
+  [RsvpStatus.notAttending]: "bg-destructive",
 };
 
 interface AttendeeRowProps {
@@ -86,7 +82,7 @@ function AttendeeRow({ attendee, isOwnProfile }: AttendeeRowProps) {
 
   return (
     <div
-      className="flex items-center justify-between gap-3 py-3 border-b border-border last:border-0"
+      className="glass-card rounded-2xl flex items-center justify-between gap-3 px-4 py-3 animate-slide-up"
       data-ocid="attendee-row"
     >
       <button
@@ -98,49 +94,58 @@ function AttendeeRow({ attendee, isOwnProfile }: AttendeeRowProps) {
             params: { username: profile.username },
           })
         }
-        className="flex items-center gap-3 flex-1 min-w-0 text-left tap-target"
+        className="flex items-center gap-3 flex-1 min-w-0 text-left"
       >
-        <Avatar className="w-9 h-9 flex-shrink-0">
+        <Avatar className="w-10 h-10 flex-shrink-0 ring-2 ring-accent/20">
           {profile?.photo && (
             <AvatarImage
               src={profile.photo.getDirectURL()}
               alt={profile.username}
             />
           )}
-          <AvatarFallback className="font-display font-semibold text-sm bg-secondary text-secondary-foreground">
+          <AvatarFallback className="font-display font-bold text-sm bg-accent/20 text-accent">
             {profile ? profile.username.slice(0, 2).toUpperCase() : "?"}
           </AvatarFallback>
         </Avatar>
-        <div className="flex flex-col min-w-0">
-          <span className="font-body font-medium text-sm text-foreground truncate">
+        <div className="flex flex-col min-w-0 gap-1">
+          <span className="font-body font-semibold text-sm text-foreground truncate">
             {profile ? `@${profile.username}` : "Loading…"}
           </span>
-          <Badge
-            variant={RSVP_VARIANT[attendee.rsvpStatus]}
-            className="w-fit text-xs mt-0.5"
-            data-ocid="rsvp-badge"
-          >
-            {RSVP_LABELS[attendee.rsvpStatus]}
-          </Badge>
+          {/* Glass RSVP badge */}
+          <span className="inline-flex items-center gap-1.5 glass-card rounded-full px-2 py-0.5 w-fit">
+            <span
+              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${RSVP_DOT[attendee.rsvpStatus]}`}
+            />
+            <span
+              className="text-xs font-body text-muted-foreground"
+              data-ocid="rsvp-badge"
+            >
+              {RSVP_LABELS[attendee.rsvpStatus]}
+            </span>
+          </span>
         </div>
       </button>
 
       {!isOwnProfile && (
-        <Button
-          size="sm"
-          variant={isFollowingQuery.data ? "outline" : "ghost"}
+        <button
+          type="button"
+          data-ocid="attendee-follow-btn"
           onClick={() => followMutation.mutate()}
           disabled={followMutation.isPending || isFollowingQuery.isLoading}
-          className="tap-target flex-shrink-0"
-          data-ocid="attendee-follow-btn"
           aria-label={isFollowingQuery.data ? "Unfollow" : "Follow"}
+          className={[
+            "w-9 h-9 rounded-xl flex items-center justify-center transition-smooth button-spring disabled:opacity-50 flex-shrink-0",
+            isFollowingQuery.data
+              ? "glass-card text-muted-foreground hover:text-foreground"
+              : "glass-card text-accent hover:opacity-80",
+          ].join(" ")}
         >
           {isFollowingQuery.data ? (
             <UserMinus className="w-4 h-4" />
           ) : (
             <UserPlus className="w-4 h-4" />
           )}
-        </Button>
+        </button>
       )}
     </div>
   );
@@ -163,11 +168,14 @@ export function AttendeesTab({ momentId }: AttendeesTabProps) {
     return (
       <div className="space-y-3 pt-2">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center gap-3 py-3">
-            <Skeleton className="w-9 h-9 rounded-full" />
-            <div className="space-y-1.5 flex-1">
-              <Skeleton className="w-28 h-4 rounded" />
-              <Skeleton className="w-16 h-3 rounded" />
+          <div
+            key={i}
+            className="glass-card rounded-2xl flex items-center gap-3 px-4 py-3"
+          >
+            <Skeleton className="w-10 h-10 rounded-full animate-shimmer" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="w-28 h-4 rounded-full animate-shimmer" />
+              <Skeleton className="w-16 h-3 rounded-full animate-shimmer" />
             </div>
           </div>
         ))}
@@ -186,7 +194,7 @@ export function AttendeesTab({ momentId }: AttendeesTabProps) {
   }
 
   return (
-    <div className="pt-2" data-ocid="attendees-list">
+    <div className="pt-2 space-y-2" data-ocid="attendees-list">
       {attendeesQuery.data.map((attendee) => {
         const isOwnProfile =
           !!principal && attendee.userId.toText() === principal.toText();

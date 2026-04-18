@@ -4,98 +4,128 @@
 
 @layer base {
   :root {
-    --font-display: "General Sans";
-    --font-body: "DM Sans";
+    --font-display: "Space Grotesk";
+    --font-body: "Figtree";
     --font-mono: "Geist Mono";
-    --radius: 0.625rem;
+    --radius: 0.5rem;
 
-    --background: 0.98 0 0;
-    --foreground: 0.12 0 0;
-    --card: 1 0 0;
-    --card-foreground: 0.12 0 0;
-    --popover: 1 0 0;
-    --popover-foreground: 0.12 0 0;
+    /* Gradient backgrounds — warm pearl to soft white */
+    --gradient-bg-light: linear-gradient(
+      135deg,
+      oklch(0.97 0.01 80) 0%,
+      oklch(0.99 0.005 90) 100%
+    );
 
-    --primary: 0.15 0 0;
+    /* Core palette — light mode */
+    --background: 0.97 0.008 85;
+    --foreground: 0.14 0.01 280;
+    --card: 0.99 0.005 90;
+    --card-foreground: 0.14 0.01 280;
+    --popover: 0.99 0.005 90;
+    --popover-foreground: 0.14 0.01 280;
+
+    /* Primary: warm charcoal */
+    --primary: 0.32 0.04 280;
     --primary-foreground: 0.98 0 0;
 
-    --secondary: 0.94 0 0;
-    --secondary-foreground: 0.2 0 0;
-    --muted: 0.94 0 0;
-    --muted-foreground: 0.48 0 0;
+    /* Secondary & muted */
+    --secondary: 0.92 0.01 80;
+    --secondary-foreground: 0.25 0.01 280;
+    --muted: 0.92 0.01 80;
+    --muted-foreground: 0.48 0.01 280;
 
-    --accent: 0.15 0 0;
+    /* Accent: electric indigo — used sparingly */
+    --accent: 0.65 0.25 280;
     --accent-foreground: 0.98 0 0;
 
-    --destructive: 0.52 0.2 22;
+    /* Status colors */
+    --destructive: 0.54 0.18 22;
     --destructive-foreground: 0.98 0 0;
 
-    --success: 0.62 0.17 142;
+    --success: 0.65 0.16 142;
     --success-foreground: 0.98 0 0;
 
-    --border: 0.9 0 0;
-    --input: 0.9 0 0;
-    --ring: 0.15 0 0;
+    /* Borders & inputs */
+    --border: 0.88 0.005 85;
+    --input: 0.88 0.005 85;
+    --ring: 0.65 0.25 280;
 
-    --chart-1: 0.62 0.17 142;
-    --chart-2: 0.52 0.2 22;
-    --chart-3: 0.15 0 0;
+    /* Chart colors */
+    --chart-1: 0.65 0.16 142;
+    --chart-2: 0.54 0.18 22;
+    --chart-3: 0.65 0.25 280;
     --chart-4: 0.72 0 0;
     --chart-5: 0.48 0 0;
 
-    --sidebar: 0.98 0 0;
-    --sidebar-foreground: 0.12 0 0;
-    --sidebar-primary: 0.15 0 0;
+    /* Sidebar */
+    --sidebar: 0.97 0.008 85;
+    --sidebar-foreground: 0.14 0.01 280;
+    --sidebar-primary: 0.32 0.04 280;
     --sidebar-primary-foreground: 0.98 0 0;
-    --sidebar-accent: 0.94 0 0;
-    --sidebar-accent-foreground: 0.2 0 0;
-    --sidebar-border: 0.9 0 0;
-    --sidebar-ring: 0.15 0 0;
+    --sidebar-accent: 0.92 0.01 80;
+    --sidebar-accent-foreground: 0.25 0.01 280;
+    --sidebar-border: 0.88 0.005 85;
+    --sidebar-ring: 0.65 0.25 280;
   }
 
   .dark {
-    --background: 0.11 0 0;
-    --foreground: 0.96 0 0;
-    --card: 0.15 0 0;
-    --card-foreground: 0.96 0 0;
-    --popover: 0.17 0 0;
-    --popover-foreground: 0.96 0 0;
+    /* Gradient backgrounds — deep plum to midnight black with scroll shift */
+    --gradient-bg-dark: linear-gradient(
+      135deg,
+      oklch(0.12 0.04 290) 0%,
+      oklch(0.06 0.02 270) 100%
+    );
 
-    --primary: 0.9 0 0;
-    --primary-foreground: 0.11 0 0;
+    /* Core palette — dark mode */
+    --background: 0.08 0.02 280;
+    --foreground: 0.95 0.01 90;
+    --card: 0.14 0.02 280;
+    --card-foreground: 0.95 0.01 90;
+    --popover: 0.16 0.02 280;
+    --popover-foreground: 0.95 0.01 90;
 
-    --secondary: 0.2 0 0;
-    --secondary-foreground: 0.88 0 0;
-    --muted: 0.19 0 0;
-    --muted-foreground: 0.55 0 0;
+    /* Primary: bright near-white */
+    --primary: 0.88 0.01 90;
+    --primary-foreground: 0.08 0.02 280;
 
-    --accent: 0.9 0 0;
-    --accent-foreground: 0.11 0 0;
+    /* Secondary & muted */
+    --secondary: 0.18 0.01 280;
+    --secondary-foreground: 0.88 0.01 90;
+    --muted: 0.18 0.01 280;
+    --muted-foreground: 0.58 0.01 90;
 
+    /* Accent: bright electric indigo */
+    --accent: 0.72 0.28 280;
+    --accent-foreground: 0.08 0.02 280;
+
+    /* Status colors — adjusted for dark */
     --destructive: 0.62 0.2 22;
-    --destructive-foreground: 0.11 0 0;
+    --destructive-foreground: 0.08 0.02 280;
 
     --success: 0.56 0.15 142;
-    --success-foreground: 0.11 0 0;
+    --success-foreground: 0.08 0.02 280;
 
-    --border: 0.23 0 0;
-    --input: 0.23 0 0;
-    --ring: 0.9 0 0;
+    /* Borders & inputs */
+    --border: 0.22 0.02 280;
+    --input: 0.22 0.02 280;
+    --ring: 0.72 0.28 280;
 
+    /* Chart colors */
     --chart-1: 0.56 0.15 142;
     --chart-2: 0.62 0.2 22;
-    --chart-3: 0.9 0 0;
+    --chart-3: 0.72 0.28 280;
     --chart-4: 0.42 0 0;
     --chart-5: 0.62 0 0;
 
-    --sidebar: 0.15 0 0;
-    --sidebar-foreground: 0.96 0 0;
-    --sidebar-primary: 0.9 0 0;
-    --sidebar-primary-foreground: 0.11 0 0;
-    --sidebar-accent: 0.19 0 0;
-    --sidebar-accent-foreground: 0.88 0 0;
-    --sidebar-border: 0.23 0 0;
-    --sidebar-ring: 0.9 0 0;
+    /* Sidebar */
+    --sidebar: 0.14 0.02 280;
+    --sidebar-foreground: 0.95 0.01 90;
+    --sidebar-primary: 0.88 0.01 90;
+    --sidebar-primary-foreground: 0.08 0.02 280;
+    --sidebar-accent: 0.18 0.01 280;
+    --sidebar-accent-foreground: 0.88 0.01 90;
+    --sidebar-border: 0.22 0.02 280;
+    --sidebar-ring: 0.72 0.28 280;
   }
 
   * {
@@ -116,14 +146,14 @@
 }
 
 @font-face {
-  font-family: "General Sans";
-  src: url("/assets/fonts/GeneralSans.woff2") format("woff2");
+  font-family: "Space Grotesk";
+  src: url("/assets/fonts/SpaceGrotesk.woff2") format("woff2");
   font-display: swap;
 }
 
 @font-face {
-  font-family: "DM Sans";
-  src: url("/assets/fonts/DMSans.woff2") format("woff2");
+  font-family: "Figtree";
+  src: url("/assets/fonts/Figtree.woff2") format("woff2");
   font-display: swap;
 }
 
@@ -134,22 +164,153 @@
 }
 
 @layer utilities {
-  .transition-smooth {
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Typography scale */
+  .text-display-xl {
+    @apply text-5xl md:text-7xl font-display font-bold tracking-tight;
   }
 
+  .text-display-lg {
+    @apply text-4xl md:text-6xl font-display font-bold tracking-tight;
+  }
+
+  .text-display-md {
+    @apply text-3xl md:text-5xl font-display font-semibold tracking-tight;
+  }
+
+  .text-display-sm {
+    @apply text-2xl md:text-3xl font-display font-semibold tracking-tight;
+  }
+
+  .text-meta {
+    @apply text-xs md:text-sm font-body font-light tracking-wide uppercase;
+  }
+
+  .text-body {
+    @apply text-base md:text-lg font-body;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .transition-fast {
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Glass morphism — Dark mode variants */
+  .glass-card-dark {
+    background-color: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px rgba(255, 255, 255, 0.12);
+  }
+
+  .glass-nav-dark {
+    background-color: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+  }
+
+  .glass-modal-dark {
+    background-color: rgba(15, 10, 30, 0.85);
+    backdrop-filter: blur(32px) saturate(200%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%);
+  }
+
+  .glass-input-dark {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Glass morphism — Light mode variants */
+  .glass-card-light {
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px rgba(255, 255, 255, 0.85);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  }
+
+  .glass-nav-light {
+    background-color: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+  }
+
+  .glass-modal-light {
+    background-color: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+  }
+
+  .glass-input-light {
+    background-color: rgba(255, 255, 255, 0.75);
+    border: 1px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Gradient backgrounds */
+  .bg-gradient-light {
+    background: var(--gradient-bg-light);
+  }
+
+  .bg-gradient-dark {
+    background: var(--gradient-bg-dark);
+  }
+
+  .bg-gradient-page {
+    @apply dark:bg-gradient-dark;
+  }
+
+  /* Full-page gradient bg — light pearl / dark deep-plum (theme-aware) */
+  .gradient-bg {
+    background: var(--gradient-bg-light);
+  }
+
+  .dark .gradient-bg {
+    background: var(--gradient-bg-dark);
+  }
+
+  /* Shimmer effect for loading states */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.2) 20%,
+      rgba(255, 255, 255, 0) 40%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* Glow effect for accent states */
+  .glow-accent {
+    box-shadow: 0 0 24px oklch(var(--accent) / 0.5);
+  }
+
+  .glow-accent-sm {
+    box-shadow: 0 0 12px oklch(var(--accent) / 0.3);
+  }
+
+  /* Spring button interactions */
+  .button-spring {
+    @apply transition-transform active:scale-95;
+  }
+
+  .button-spring-lg {
+    @apply transition-transform active:scale-90;
+  }
+
+  /* Card elevation */
   .card-elevated {
     @apply bg-card border border-border rounded-lg shadow-sm;
   }
 
+  /* Tap target — mobile-first 48px minimum */
   .tap-target {
-    @apply min-h-11 min-w-11;
-  }
-
-  .glass-header {
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    background-color: oklch(var(--card) / 0.85);
+    @apply min-h-12 min-w-12;
   }
 
   /* Modal overlay */
@@ -233,5 +394,215 @@
   }
   .z-toast {
     z-index: 100;
+  }
+
+  /* Shimmer loading animation */
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      oklch(var(--muted)) 0%,
+      oklch(var(--card)) 40%,
+      oklch(var(--muted)) 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Shimmer sweep overlay — removed (caused stacking context bugs on mobile) */
+
+  /* Slide up entrance animation */
+  .animate-slide-up {
+    animation: slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  /* Scale in/out for modals */
+  .animate-scale-in {
+    animation: scale-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .animate-scale-out {
+    animation: scale-out 0.2s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  /* Glow pulse for Event Pass button */
+  .animate-glow-pulse {
+    animation: glow-pulse 2.4s ease-in-out infinite;
+  }
+
+  /* Glass card — unified theme-aware (both light + dark) */
+  .glass-card {
+    background-color: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .dark .glass-card {
+    background-color: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Glass card masonry class removed — no longer used after switching to CSS grid */
+
+  /* Glass input — unified theme-aware */
+  .glass-input {
+    background-color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .dark .glass-input {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: none;
+  }
+
+  /* Glass modal — for bottom drawer and overlays */
+  .glass-modal {
+    background-color: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.12), 0 -1px 4px rgba(0, 0, 0, 0.06);
+  }
+
+  .dark .glass-modal {
+    background-color: rgba(20, 14, 42, 0.88);
+    backdrop-filter: blur(32px) saturate(200%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.5), 0 -1px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Drawer slide animation */
+  .animate-drawer-slide {
+    animation: drawer-slide 0.35s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  }
+
+  /* Slide down entrance animation (for edit mode expansion) */
+  .animate-slide-down {
+    animation: slide-down 0.3s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+  }
+
+  /* Gradient text accent */
+  .text-gradient-accent {
+    background: linear-gradient(
+      135deg,
+      oklch(var(--accent)),
+      oklch(0.82 0.18 300)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* moment-card-reveal / moment-card-visible removed — IntersectionObserver entrance
+     animation caused flash-then-disappear on mobile/tablet. Cards now render
+     immediately at full opacity with no entrance animation. */
+
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drawer-slide {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 200% 0;
+    opacity: 1;
+  }
+  100% {
+    background-position: -200% 0;
+    opacity: 0;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 12px oklch(var(--accent) / 0.35), 0 0 24px
+      oklch(var(--accent) / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 20px oklch(var(--accent) / 0.55), 0 0 40px
+      oklch(var(--accent) / 0.25);
   }
 }

@@ -47,6 +47,9 @@ const ShareMomentPage = lazy(() =>
     default: m.ShareMomentPage,
   })),
 );
+const EventPassPage = lazy(() =>
+  import("./pages/EventPassPage").then((m) => ({ default: m.EventPassPage })),
+);
 
 function PageFallback() {
   return <LoadingSpinner fullScreen />;
@@ -205,6 +208,17 @@ const indexRoute = createRoute({
   component: IndexRedirect,
 });
 
+// Public event pass route — /event-pass/:momentId/:userId (no auth required)
+const eventPassRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/event-pass/$momentId/$userId",
+  component: () => (
+    <Suspense fallback={<PageFallback />}>
+      <EventPassPage />
+    </Suspense>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -217,6 +231,7 @@ const routeTree = rootRoute.addChildren([
   editMomentRoute,
   profileRoute,
   adminRoute,
+  eventPassRoute,
 ]);
 
 const router = createRouter({ routeTree });

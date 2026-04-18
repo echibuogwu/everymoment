@@ -1,8 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createActorWithConfig } from "@caffeineai/core-infrastructure";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -23,10 +21,12 @@ import {
   QrCode,
   Share2,
   ShieldCheck,
+  Ticket,
   Users,
 } from "lucide-react";
+import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createActor } from "../backend";
 import { AccessRequestsPanel } from "../components/AccessRequestsPanel";
 import { AttendeesTab } from "../components/AttendeesTab";
@@ -63,17 +63,19 @@ function formatTime(ts: bigint): string {
 
 function MomentDetailSkeleton() {
   return (
-    <div className="space-y-4 py-6">
-      <Skeleton className="w-full aspect-[16/9] rounded-lg" />
-      <Skeleton className="h-8 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-      <Skeleton className="h-4 w-2/3" />
-      <Skeleton className="h-16 w-full" />
+    <div className="space-y-0">
+      <Skeleton className="w-full h-[60vh] rounded-none" />
+      <div className="px-4 pt-6 space-y-4">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+      </div>
     </div>
   );
 }
 
-/** Inline share section — copy button + collapsible QR code */
+/** Inline share section — glass surface with copy-link + collapsible QR */
 function ShareSection({ momentId }: { momentId: string }) {
   const [copied, setCopied] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
@@ -91,7 +93,7 @@ function ShareSection({ momentId }: { momentId: string }) {
 
   return (
     <div
-      className="rounded-xl border border-border bg-card p-4 space-y-3"
+      className="glass-card rounded-2xl p-4 space-y-3"
       data-ocid="share-section"
     >
       <div className="flex items-center gap-2">
@@ -101,12 +103,11 @@ function ShareSection({ momentId }: { momentId: string }) {
         </h3>
       </div>
 
-      {/* Copy Link — primary action */}
       <Button
         variant="outline"
         size="sm"
         onClick={handleCopy}
-        className="w-full gap-2 transition-colors"
+        className="w-full gap-2 transition-smooth button-spring"
         data-ocid="copy-share-link-btn"
       >
         {copied ? (
@@ -122,12 +123,11 @@ function ShareSection({ momentId }: { momentId: string }) {
         )}
       </Button>
 
-      {/* QR Code — collapsible */}
       <div className="space-y-2">
         <button
           type="button"
           onClick={() => setQrOpen((v) => !v)}
-          className="tap-target w-full flex items-center justify-between px-3 py-2 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors text-sm"
+          className="tap-target w-full flex items-center justify-between px-3 py-2 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-smooth text-sm"
           aria-expanded={qrOpen}
           data-ocid="qr-toggle-btn"
         >
@@ -142,50 +142,136 @@ function ShareSection({ momentId }: { momentId: string }) {
           )}
         </button>
 
-        {qrOpen && (
-          <div
-            className="flex justify-center p-4 bg-background rounded-lg border border-border"
-            data-ocid="qr-code-container"
-          >
-            <QRCodeSVG
-              value={shareUrl}
-              size={160}
-              level="M"
-              includeMargin={false}
-              className="rounded"
-            />
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {qrOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="overflow-hidden"
+              data-ocid="qr-code-container"
+            >
+              <div className="flex justify-center p-4 bg-background rounded-xl border border-border">
+                <QRCodeSVG
+                  value={shareUrl}
+                  size={160}
+                  level="M"
+                  includeMargin={false}
+                  className="rounded"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
-/** Core content component — accepts momentId as a prop so it can be used from
- *  both /moments/$momentId and /moment/$momentId (public share link) routes. */
+type TabId = "memories" | "media" | "people" | "access";
+
+interface GlassTabBarProps {
+  tabs: { id: TabId; label: string; icon: React.ReactNode }[];
+  active: TabId;
+  onChange: (id: TabId) => void;
+}
+
+function GlassTabBar({ tabs, active, onChange }: GlassTabBarProps) {
+  return (
+    <div
+      className="glass-card rounded-full p-1 flex w-fit mx-auto"
+      data-ocid="moment-tabs"
+    >
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className="relative px-4 py-2 rounded-full text-xs font-body font-medium transition-colors z-10 flex items-center gap-1.5"
+          style={{
+            color: active === tab.id ? "oklch(var(--accent))" : undefined,
+          }}
+          data-ocid={`moment-tab-${tab.id}`}
+          aria-selected={active === tab.id}
+        >
+          {active === tab.id && (
+            <motion.span
+              layoutId="tab-active"
+              className="absolute inset-0 glass-card rounded-full z-[-1]"
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span
+            className={
+              active === tab.id ? "text-accent" : "text-muted-foreground"
+            }
+          >
+            {tab.icon}
+          </span>
+          <span
+            className={
+              active === tab.id ? "text-accent" : "text-muted-foreground"
+            }
+          >
+            {tab.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Parallax hero image */
+function HeroImage({ src, alt }: { src: string; alt: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  const y = useTransform(scrollY, [0, 600], [0, 240]);
+
+  return (
+    <div
+      ref={ref}
+      className="relative w-full h-[60vh] md:h-[70vh] overflow-hidden bg-muted"
+    >
+      <motion.img
+        src={src}
+        alt={alt}
+        className="w-full h-[120%] object-cover absolute inset-0"
+        style={{ y, willChange: "transform" }}
+      />
+      {/* Bottom gradient fade */}
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent pointer-events-none" />
+    </div>
+  );
+}
+
+function HeroGradient() {
+  return (
+    <div className="relative w-full h-[60vh] md:h-[70vh] overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-accent/30 via-background to-muted" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
+    </div>
+  );
+}
+
 export function MomentDetailContent({ momentId }: { momentId: string }) {
   const { actor, isFetching } = useBackend();
   const { isAuthenticated, principal } = useAuth();
   const navigate = useNavigate();
   const [showEventPass, setShowEventPass] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("memories");
 
   const { data: moment, isLoading } = useQuery<MomentDetail | null>({
     queryKey: QUERY_KEYS.momentDetail(momentId),
     queryFn: async () => {
-      // Use authenticated actor when available, otherwise create an anonymous
-      // actor so unauthenticated visitors can still load public moments and
-      // see the access-request screen for private ones.
       const effectiveActor = actor
         ? actor
         : await createActorWithConfig(createActor);
       return effectiveActor.getMomentDetail(momentId);
     },
-    // Always enabled — getMomentDetail is a public query that anonymous
-    // principals can call. The actor is never null after the fallback above.
     enabled: true,
   });
 
-  // Fetch attendees to determine if the current user is attending
   const { data: attendees } = useQuery<Attendee[]>({
     queryKey: QUERY_KEYS.momentAttendees(momentId),
     queryFn: async () => {
@@ -204,7 +290,6 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
   const showAccessTab = moment?.isOwner && isPrivate;
   const coverUrl = moment?.coverImage?.getDirectURL();
 
-  // A user can see Memories if they are the owner OR have an attending/maybe RSVP
   const myAttendance = attendees?.find(
     (a) => principal && a.userId.toText() === principal.toText(),
   );
@@ -214,10 +299,6 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
       myAttendance?.rsvpStatus === RsvpStatus.attending ||
       myAttendance?.rsvpStatus === RsvpStatus.maybe);
 
-  // Share section is visible to:
-  // - Owner always
-  // - Approved viewers of private moments
-  // - All authenticated users for public moments
   const showShare =
     !!moment &&
     isAuthenticated &&
@@ -229,13 +310,45 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
     navigate({ to: "/explore" });
   };
 
+  // Build tabs in fixed order: Memories first (always), then Media, People, Access
+  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [];
+  if (isAttending) {
+    tabs.push({
+      id: "memories",
+      label: "Memories",
+      icon: <MessageSquareHeart className="w-3.5 h-3.5" />,
+    });
+  }
+  tabs.push({
+    id: "media",
+    label: "Media",
+    icon: <Images className="w-3.5 h-3.5" />,
+  });
+  tabs.push({
+    id: "people",
+    label: "People",
+    icon: <Users className="w-3.5 h-3.5" />,
+  });
+  if (showAccessTab) {
+    tabs.push({
+      id: "access",
+      label: "Access",
+      icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    });
+  }
+
+  // Ensure active tab is valid given available tabs
+  const validActiveTab =
+    tabs.find((t) => t.id === activeTab)?.id ??
+    (isAttending ? "memories" : "media");
+
   return (
     <AuthGuard requireAuth={false} currentPath={`/moments/${momentId}`}>
       <Layout>
         {isLoading ? (
           <MomentDetailSkeleton />
         ) : !moment ? (
-          <div className="py-6">
+          <div className="py-6 px-4">
             <EmptyState
               title="Moment not found"
               description="This moment may have been removed or is no longer available."
@@ -251,11 +364,11 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
             />
           </div>
         ) : !hasAccess ? (
-          <div className="py-4">
+          <div className="py-4 px-4">
             <button
               type="button"
               onClick={handleBack}
-              className="tap-target flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 -ml-1"
+              className="tap-target flex items-center gap-2 text-muted-foreground hover:text-foreground transition-smooth mb-4 -ml-1"
               aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -264,252 +377,219 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
             <PrivateMomentPreview moment={moment} />
           </div>
         ) : (
-          <div className="py-6 space-y-0">
-            {/* Back */}
-            <button
-              type="button"
-              onClick={handleBack}
-              className="tap-target flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 -ml-1"
-              data-ocid="moment-back-btn"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="text-sm font-body">Back</span>
-            </button>
-
-            {/* Cover image */}
-            {coverUrl && (
-              <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-muted mb-5">
-                <img
-                  src={coverUrl}
-                  alt={moment.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
-
-            {/* Header */}
-            <div className="space-y-3 pb-5">
-              <div className="flex items-start justify-between gap-3">
-                <h1 className="font-display font-bold text-2xl text-foreground leading-tight flex-1 min-w-0">
-                  {moment.title}
-                </h1>
-                {moment.isOwner && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      navigate({
-                        to: "/moments/$momentId/edit",
-                        params: { momentId },
-                      })
-                    }
-                    className="flex-shrink-0 tap-target"
-                    data-ocid="edit-moment-btn"
-                  >
-                    <Pencil className="w-3.5 h-3.5 mr-1" />
-                    Edit
-                  </Button>
-                )}
-              </div>
-
-              {/* Visibility badge */}
-              <Badge
-                variant={isPrivate ? "outline" : "secondary"}
-                className="flex items-center gap-1 w-fit"
+          <div className="pb-10">
+            {/* Hero — full bleed, no side padding */}
+            <div className="relative -mx-4 md:-mx-6">
+              {/* Floating back button */}
+              <button
+                type="button"
+                onClick={handleBack}
+                className="absolute top-4 left-4 z-20 flex items-center justify-center w-9 h-9 rounded-full glass-card transition-smooth button-spring"
+                data-ocid="moment-back-btn"
+                aria-label="Back"
               >
-                {isPrivate ? (
-                  <Lock className="w-3 h-3" />
-                ) : (
-                  <Globe className="w-3 h-3" />
-                )}
-                {isPrivate ? "Private" : "Public"}
-              </Badge>
+                <ArrowLeft className="w-4 h-4 text-foreground" />
+              </button>
 
-              {/* Meta */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4 flex-shrink-0" />
-                  <span className="font-body">
-                    {formatDate(moment.eventDate)}
-                  </span>
+              {/* Edit button — floating top right */}
+              {moment.isOwner && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate({
+                      to: "/moments/$momentId/edit",
+                      params: { momentId },
+                    })
+                  }
+                  className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-2 rounded-full glass-card text-xs font-body font-medium text-foreground transition-smooth button-spring"
+                  data-ocid="edit-moment-btn"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+              )}
+
+              {coverUrl ? (
+                <HeroImage src={coverUrl} alt={moment.title} />
+              ) : (
+                <HeroGradient />
+              )}
+            </div>
+
+            {/* Glass info card — overlaps hero by 60px */}
+            <motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 25 }}
+              className="glass-card rounded-t-3xl -mt-16 relative z-10 mx-0 px-5 pt-6 pb-5 space-y-4"
+            >
+              {/* Title + visibility */}
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <h1 className="font-display font-bold text-2xl text-foreground leading-tight flex-1 min-w-0">
+                    {moment.title}
+                  </h1>
+                  <Badge
+                    variant={isPrivate ? "outline" : "secondary"}
+                    className="flex items-center gap-1 flex-shrink-0"
+                  >
+                    {isPrivate ? (
+                      <Lock className="w-3 h-3" />
+                    ) : (
+                      <Globe className="w-3 h-3" />
+                    )}
+                    {isPrivate ? "Private" : "Public"}
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4 flex-shrink-0" />
-                  <span className="font-body">
-                    {formatTime(moment.eventDate)}
-                  </span>
-                </div>
-                {moment.location && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <MapPin className="w-4 h-4 flex-shrink-0" />
-                      <span className="font-body">{moment.location}</span>
+
+                {/* Meta */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Calendar className="w-4 h-4 flex-shrink-0" />
+                    <span className="font-body">
+                      {formatDate(moment.eventDate)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <span className="font-body">
+                      {formatTime(moment.eventDate)}
+                    </span>
+                  </div>
+                  {moment.location && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <MapPin className="w-4 h-4 flex-shrink-0" />
+                        <span className="font-body">{moment.location}</span>
+                      </div>
+                      {moment.locationLat !== undefined &&
+                        moment.locationLng !== undefined && (
+                          <div
+                            className="rounded-xl overflow-hidden border border-border"
+                            data-ocid="moment-map-container"
+                          >
+                            <iframe
+                              title={`Map of ${moment.location}`}
+                              width="100%"
+                              height="180"
+                              style={{ border: 0, display: "block" }}
+                              loading="lazy"
+                              src={`https://www.openstreetmap.org/export/embed.html?bbox=${moment.locationLng - 0.01},${moment.locationLat - 0.01},${moment.locationLng + 0.01},${moment.locationLat + 0.01}&layer=mapnik&marker=${moment.locationLat},${moment.locationLng}`}
+                              data-ocid="moment-map-iframe"
+                            />
+                          </div>
+                        )}
                     </div>
-                    {moment.locationLat !== undefined &&
-                      moment.locationLng !== undefined && (
-                        <div
-                          className="rounded-lg overflow-hidden border border-border"
-                          data-ocid="moment-map-container"
-                        >
-                          <iframe
-                            title={`Map of ${moment.location}`}
-                            width="100%"
-                            height="180"
-                            style={{ border: 0, display: "block" }}
-                            loading="lazy"
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${moment.locationLng - 0.01},${moment.locationLat - 0.01},${moment.locationLng + 0.01},${moment.locationLat + 0.01}&layer=mapnik&marker=${moment.locationLat},${moment.locationLng}`}
-                            data-ocid="moment-map-iframe"
-                          />
-                        </div>
-                      )}
+                  )}
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Users className="w-4 h-4 flex-shrink-0" />
+                    <span className="font-body">
+                      {moment.attendeeCount.toString()} attending
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {moment.description && (
+                  <p className="text-sm text-muted-foreground font-body leading-relaxed">
+                    {moment.description}
+                  </p>
+                )}
+
+                {/* Tags */}
+                {moment.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {moment.tags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="secondary"
+                        className="text-xs font-body"
+                      >
+                        #{tag}
+                      </Badge>
+                    ))}
                   </div>
                 )}
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Users className="w-4 h-4 flex-shrink-0" />
-                  <span className="font-body">
-                    {moment.attendeeCount.toString()} attending
-                  </span>
-                </div>
               </div>
 
-              {/* Description */}
-              {moment.description && (
-                <p className="text-sm text-muted-foreground font-body leading-relaxed">
-                  {moment.description}
-                </p>
-              )}
-
-              {/* Tags */}
-              {moment.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {moment.tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="text-xs font-body"
-                    >
-                      #{tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              {/* RSVP — RsvpButton handles both authenticated and guest states */}
-              <div className="pt-1">
+              {/* RSVP */}
+              <div>
                 <p className="text-xs text-muted-foreground font-body mb-2 uppercase tracking-wide">
                   Your RSVP
                 </p>
                 <RsvpButton momentId={momentId} />
               </div>
 
-              {/* Event Pass — only visible when attending */}
+              {/* Event Pass button — attending only */}
               {isAttending && (
-                <div className="pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowEventPass(true)}
-                    className="w-full gap-2 tap-target"
-                    data-ocid="event-pass-open_modal_button"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    Your Event Pass
-                  </Button>
-                </div>
+                <motion.button
+                  type="button"
+                  onClick={() => setShowEventPass(true)}
+                  whileTap={{ scale: 0.96 }}
+                  className="relative w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl font-display font-semibold text-sm text-accent-foreground overflow-hidden animate-glow-pulse"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.55 0.28 280), oklch(0.45 0.22 300))",
+                  }}
+                  data-ocid="event-pass-open_modal_button"
+                >
+                  <span className="shimmer-sweep" />
+                  <Ticket className="w-4 h-4" />
+                  Your Event Pass
+                </motion.button>
               )}
+
+              {/* Share section */}
+              {showShare && <ShareSection momentId={moment.id} />}
+            </motion.div>
+
+            {/* Glass tab bar */}
+            <div className="sticky top-0 z-header py-3 bg-background/80 backdrop-blur-md -mx-4 px-4">
+              <GlassTabBar
+                tabs={tabs}
+                active={validActiveTab}
+                onChange={(id) => setActiveTab(id)}
+              />
             </div>
 
-            {/* Share section — inline below RSVP, never in a modal */}
-            {showShare && (
-              <div className="pb-5">
-                <ShareSection momentId={moment.id} />
-              </div>
-            )}
-
-            <Separator className="my-1" />
-
-            {/* Tabs */}
-            <Tabs
-              defaultValue={isAttending ? "memories" : "media"}
-              className="mt-5"
-            >
-              <TabsList
-                className={`w-full grid bg-muted/50 ${
-                  isAttending && showAccessTab
-                    ? "grid-cols-4"
-                    : isAttending || showAccessTab
-                      ? "grid-cols-3"
-                      : "grid-cols-2"
-                }`}
-                data-ocid="moment-tabs"
-              >
-                {isAttending && (
-                  <TabsTrigger
-                    value="memories"
-                    className="font-body text-xs gap-1.5"
-                    data-ocid="moment-tab-memories"
-                  >
-                    <MessageSquareHeart className="w-3.5 h-3.5" />
-                    Memories
-                  </TabsTrigger>
-                )}
-                <TabsTrigger
-                  value="media"
-                  className="font-body text-xs gap-1.5"
-                  data-ocid="moment-tab-media"
+            {/* Tab content */}
+            <div className="mt-4">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={validActiveTab}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
                 >
-                  <Images className="w-3.5 h-3.5" />
-                  Media
-                </TabsTrigger>
-                <TabsTrigger
-                  value="people"
-                  className="font-body text-xs gap-1.5"
-                  data-ocid="moment-tab-people"
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  People
-                </TabsTrigger>
-                {showAccessTab && (
-                  <TabsTrigger
-                    value="access"
-                    className="font-body text-xs gap-1.5"
-                    data-ocid="moment-tab-access"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Access
-                  </TabsTrigger>
-                )}
-              </TabsList>
-
-              {isAttending && (
-                <TabsContent value="memories" className="mt-4">
-                  <MemoriesTab momentId={moment.id} />
-                </TabsContent>
-              )}
-
-              <TabsContent value="media" className="mt-4">
-                <MomentMediaTab momentId={moment.id} isOwner={moment.isOwner} />
-              </TabsContent>
-
-              <TabsContent value="people" className="mt-4">
-                <AttendeesTab momentId={momentId} />
-              </TabsContent>
-
-              {showAccessTab && (
-                <TabsContent value="access" className="mt-4">
-                  <AccessRequestsPanel momentId={moment.id} />
-                </TabsContent>
-              )}
-            </Tabs>
+                  {validActiveTab === "memories" && isAttending && (
+                    <MemoriesTab momentId={moment.id} />
+                  )}
+                  {validActiveTab === "media" && (
+                    <MomentMediaTab
+                      momentId={moment.id}
+                      isOwner={moment.isOwner}
+                      isAttending={isAttending}
+                      currentUserId={principal?.toText() ?? null}
+                    />
+                  )}
+                  {validActiveTab === "people" && (
+                    <AttendeesTab momentId={momentId} />
+                  )}
+                  {validActiveTab === "access" && showAccessTab && (
+                    <AccessRequestsPanel momentId={moment.id} />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
         )}
       </Layout>
 
-      {/* Event Pass modal — rendered outside Layout to avoid stacking context issues */}
       {showEventPass && (
         <EventPassModal
           momentId={momentId}
+          currentUserPrincipal={principal?.toText() ?? null}
           actor={actor}
           isFetchingActor={isFetching}
           onClose={() => setShowEventPass(false)}
@@ -519,7 +599,6 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
   );
 }
 
-/** Route component for /moments/$momentId */
 export function MomentDetailPage() {
   const { momentId } = useParams({ from: "/moments/$momentId" });
   return <MomentDetailContent momentId={momentId} />;

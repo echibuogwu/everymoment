@@ -18,28 +18,34 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div
-      data-ocid="empty-state"
+      data-ocid="empty_state"
       className={cn(
-        "flex flex-col items-center justify-center text-center py-16 px-6 gap-4",
+        "flex flex-col items-center justify-center text-center py-14 px-6 gap-5 animate-slide-up",
         className,
       )}
     >
-      {Icon && (
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-          <Icon className="w-8 h-8 text-muted-foreground" strokeWidth={1.5} />
-        </div>
-      )}
-      <div className="space-y-1">
-        <h3 className="font-display font-semibold text-foreground text-lg">
-          {title}
-        </h3>
-        {description && (
-          <p className="text-muted-foreground text-sm max-w-xs">
-            {description}
-          </p>
+      <div className="glass-card rounded-3xl p-8 flex flex-col items-center gap-4 max-w-xs w-full">
+        {Icon && (
+          <div className="glass-card rounded-2xl p-4 glow-accent-sm">
+            <Icon
+              className="w-8 h-8 text-accent"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+          </div>
         )}
+        <div className="space-y-1.5">
+          <h3 className="font-display font-bold text-lg text-gradient-accent">
+            {title}
+          </h3>
+          {description && (
+            <p className="text-muted-foreground text-sm font-body leading-relaxed">
+              {description}
+            </p>
+          )}
+        </div>
+        {action && <div className="mt-1 w-full">{action}</div>}
       </div>
-      {action && <div className="mt-2">{action}</div>}
     </div>
   );
 }

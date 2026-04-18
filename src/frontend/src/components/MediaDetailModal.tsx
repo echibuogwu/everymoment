@@ -1,6 +1,3 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FileAudio,
@@ -17,15 +14,14 @@ import { useEffect, useRef } from "react";
 import { MediaKind } from "../backend";
 import { useBackend } from "../hooks/use-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
-import { showError, showSuccess } from "../lib/toast";
-import type { Folder, Media } from "../types";
-import type { UserProfilePublic } from "../types";
+import { showError } from "../lib/toast";
+import type { Folder, Media, UserProfilePublic } from "../types";
 
 const KIND_ICONS: Record<MediaKind, React.ReactNode> = {
-  [MediaKind.image]: <ImageIcon className="w-5 h-5" />,
-  [MediaKind.video]: <Film className="w-5 h-5" />,
-  [MediaKind.audio]: <FileAudio className="w-5 h-5" />,
-  [MediaKind.document_]: <FileText className="w-5 h-5" />,
+  [MediaKind.image]: <ImageIcon className="w-4 h-4" />,
+  [MediaKind.video]: <Film className="w-4 h-4" />,
+  [MediaKind.audio]: <FileAudio className="w-4 h-4" />,
+  [MediaKind.document_]: <FileText className="w-4 h-4" />,
 };
 
 const KIND_LABELS: Record<MediaKind, string> = {
@@ -47,7 +43,10 @@ function formatDate(ts: bigint): string {
 
 interface MediaDetailModalProps {
   media: Media;
+  /** Deprecated — use canDelete for fine-grained control */
   isOwner: boolean;
+  /** If provided, overrides isOwner for showing the delete button */
+  canDelete?: boolean;
   folders: Folder[];
   onClose: () => void;
   onDelete: (media: Media) => void;
@@ -56,18 +55,21 @@ interface MediaDetailModalProps {
 export function MediaDetailModal({
   media,
   isOwner,
+  canDelete,
   folders,
   onClose,
   onDelete,
 }: MediaDetailModalProps) {
-  const overlayRef = useRef<HTMLDialogElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const { actor } = useBackend();
   const queryClient = useQueryClient();
+
+  // If canDelete is explicitly passed use it, otherwise fall back to isOwner
+  const showDeleteButton = canDelete !== undefined ? canDelete : isOwner;
 
   const folder = folders.find((f) => f.id === media.folderId);
   const mediaUrl = media.blob.getDirectURL();
 
-  // Fetch uploader profile
   const { data: uploaderProfile } = useQuery<UserProfilePublic | null>({
     queryKey: QUERY_KEYS.userProfile(media.uploadedBy.toString()),
     queryFn: async () => {
@@ -77,7 +79,6 @@ export function MediaDetailModal({
     enabled: !!actor,
   });
 
-  // Like state
   const { data: hasLiked, refetch: refetchLike } = useQuery<boolean>({
     queryKey: QUERY_KEYS.hasLiked(media.id.toString()),
     queryFn: async () => {
@@ -100,7 +101,6 @@ export function MediaDetailModal({
     }
   };
 
-  // Close on Escape
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -109,7 +109,6 @@ export function MediaDetailModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  // Trap scroll
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -122,7 +121,7 @@ export function MediaDetailModal({
   };
 
   return (
-    <dialog
+    <div
       ref={overlayRef}
       data-ocid="media-detail-overlay"
       onClick={handleOverlayClick}
@@ -130,22 +129,25 @@ export function MediaDetailModal({
         if (e.key === "Escape") onClose();
       }}
       aria-modal="true"
-      open
-      className="fixed inset-0 z-50 m-0 p-0 w-full h-full max-w-none max-h-none bg-foreground/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 border-none"
+      aria-label="Media detail"
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+      style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(12px)" }}
     >
       <div
-        className="bg-background w-full sm:max-w-2xl sm:rounded-xl overflow-hidden max-h-[96dvh] flex flex-col shadow-2xl"
+        className="glass-modal w-full sm:max-w-3xl sm:rounded-3xl overflow-hidden max-h-[98dvh] sm:max-h-[96dvh] flex flex-col animate-scale-in rounded-t-3xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         role="document"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+        {/* Header bar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="gap-1 font-body">
+            {/* Kind badge */}
+            <span className="glass-card rounded-full flex items-center gap-1.5 px-3 py-1 text-xs font-body font-medium text-foreground">
               {KIND_ICONS[media.kind]}
               {KIND_LABELS[media.kind]}
-            </Badge>
+            </span>
             {folder && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground font-body">
                 <FolderOpen className="w-3.5 h-3.5" />
@@ -153,71 +155,86 @@ export function MediaDetailModal({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {isOwner && (
-              <Button
+          <div className="flex items-center gap-1">
+            {showDeleteButton && (
+              <button
+                type="button"
                 data-ocid="delete-media-btn"
-                variant="ghost"
-                size="icon"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10 tap-target"
                 onClick={() => onDelete(media)}
                 aria-label="Delete media"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-destructive hover:bg-destructive/15 transition-smooth button-spring"
               >
                 <Trash2 className="w-4 h-4" />
-              </Button>
+              </button>
             )}
-            <Button
+            <button
+              type="button"
               data-ocid="close-media-modal-btn"
-              variant="ghost"
-              size="icon"
-              className="tap-target"
               onClick={onClose}
               aria-label="Close"
+              className="w-9 h-9 rounded-full glass-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-smooth button-spring"
             >
-              <X className="w-5 h-5" />
-            </Button>
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Media content */}
-        <div className="bg-muted flex items-center justify-center overflow-hidden flex-shrink-0 min-h-[200px] max-h-[50dvh]">
+        {/* Media area — full available height, no artificial cap */}
+        <div className="bg-black/60 flex items-center justify-center overflow-hidden flex-1 min-h-[200px]">
           {media.kind === MediaKind.image && (
             <img
               src={mediaUrl}
               alt={media.filename}
-              className="max-w-full max-h-full object-contain"
+              className="max-w-full max-h-[90vh] w-auto h-auto object-contain"
             />
           )}
           {media.kind === MediaKind.video && (
             <video
               src={mediaUrl}
               controls
-              className="max-w-full max-h-full"
+              autoPlay={false}
+              className="max-w-full max-h-[90vh] w-full h-auto"
               playsInline
             >
               <track kind="captions" />
             </video>
           )}
           {media.kind === MediaKind.audio && (
-            <div className="flex flex-col items-center gap-4 p-8 w-full">
-              <div className="w-20 h-20 rounded-full bg-foreground/10 flex items-center justify-center">
-                <FileAudio className="w-10 h-10 text-muted-foreground" />
+            <div className="flex flex-col items-center gap-6 p-10 w-full">
+              <div
+                className="w-24 h-24 rounded-full flex items-center justify-center"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.55 0.28 280 / 0.2), oklch(0.45 0.22 300 / 0.2))",
+                  border: "2px solid oklch(0.55 0.28 280 / 0.3)",
+                  boxShadow: "0 0 32px oklch(0.55 0.28 280 / 0.2)",
+                }}
+              >
+                <FileAudio className="w-10 h-10 text-accent" />
               </div>
-              <audio src={mediaUrl} controls className="w-full max-w-sm">
+              <p className="text-sm font-body text-muted-foreground text-center truncate max-w-[260px]">
+                {media.filename}
+              </p>
+              <audio
+                src={mediaUrl}
+                controls
+                className="w-full max-w-md"
+                autoPlay={false}
+              >
                 <track kind="captions" />
               </audio>
             </div>
           )}
           {media.kind === MediaKind.document_ && (
-            <div className="flex flex-col items-center gap-4 p-8">
-              <div className="w-20 h-20 rounded-full bg-foreground/10 flex items-center justify-center">
-                <FileText className="w-10 h-10 text-muted-foreground" />
+            <div className="flex flex-col items-center gap-5 p-10">
+              <div className="w-20 h-20 rounded-full glass-card glow-accent-sm flex items-center justify-center">
+                <FileText className="w-9 h-9 text-accent" />
               </div>
               <a
                 href={mediaUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-body underline underline-offset-2 text-foreground hover:text-muted-foreground"
+                className="text-sm font-body underline underline-offset-2 text-accent hover:opacity-80 transition-smooth"
               >
                 Open document
               </a>
@@ -225,13 +242,13 @@ export function MediaDetailModal({
           )}
         </div>
 
-        {/* Info */}
-        <div className="px-4 py-3 space-y-3 overflow-y-auto">
-          <p className="font-body font-medium text-foreground break-words">
+        {/* Info + actions */}
+        <div className="px-4 py-4 space-y-3 overflow-y-auto flex-shrink-0 border-t border-white/10">
+          <p className="font-body font-semibold text-foreground break-words">
             {media.filename}
           </p>
 
-          <Separator />
+          <div className="h-px bg-white/10" />
 
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -245,31 +262,31 @@ export function MediaDetailModal({
             </span>
           </div>
 
-          <Separator />
+          <div className="h-px bg-white/10" />
 
           {/* Like action */}
-          <div className="flex items-center gap-3 pb-1">
+          <div className="flex items-center gap-3 pb-2">
             <button
               type="button"
               data-ocid="like-media-btn"
               onClick={handleToggleLike}
-              className={`
-                flex items-center gap-2 text-sm font-body transition-smooth tap-target
-                px-3 py-1.5 rounded-full border
-                ${
-                  hasLiked
-                    ? "bg-foreground text-background border-foreground"
-                    : "text-foreground border-border hover:bg-muted"
-                }
-              `}
               aria-label={hasLiked ? "Unlike" : "Like"}
+              className={[
+                "flex items-center gap-2 text-sm font-body transition-smooth button-spring",
+                "px-4 py-2 rounded-full border",
+                hasLiked
+                  ? "bg-accent/20 text-accent border-accent/40 glow-accent-sm"
+                  : "glass-card text-muted-foreground border-white/10 hover:text-foreground",
+              ].join(" ")}
             >
-              <Heart className={`w-4 h-4 ${hasLiked ? "fill-current" : ""}`} />
+              <Heart
+                className={`w-4 h-4 ${hasLiked ? "fill-current text-accent" : ""}`}
+              />
               <span>{media.likeCount.toString()}</span>
             </button>
           </div>
         </div>
       </div>
-    </dialog>
+    </div>
   );
 }

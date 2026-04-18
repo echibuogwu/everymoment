@@ -1,4 +1,5 @@
 import Runtime "mo:core/Runtime";
+import List "mo:core/List";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import MomentsLib "../lib/moments";
 import MediaLib "../lib/media";
@@ -44,20 +45,47 @@ mixin (
     MomentsLib.getMomentDetail(momentsState, caller, momentId);
   };
 
-  public query func searchMoments(searchText : ?Text, tags : [Text], offset : Nat, limit : Nat) : async [T.MomentListItem] {
-    MomentsLib.listPublicMoments(momentsState, searchText, tags, offset, limit);
+  // searchMoments: full-featured search with optional date range and location filters.
+  // Recurring moments are expanded into virtual occurrences within the date range.
+  // dateRangeStart / dateRangeEnd: nanosecond timestamps (null = no range filter)
+  // locationLat / locationLng / radiusKm: for "near me" filtering (null = no location filter)
+  public query func searchMoments(
+    searchText : ?Text,
+    tags : [Text],
+    dateRangeStart : ?Common.Timestamp,
+    dateRangeEnd : ?Common.Timestamp,
+    locationLat : ?Float,
+    locationLng : ?Float,
+    radiusKm : ?Float,
+    offset : Nat,
+    limit : Nat
+  ) : async [T.MomentListItem] {
+    MomentsLib.listPublicMoments(
+      momentsState,
+      searchText,
+      tags,
+      dateRangeStart,
+      dateRangeEnd,
+      locationLat,
+      locationLng,
+      radiusKm,
+      offset,
+      limit
+    );
   };
 
   public query ({ caller }) func getMyMoments() : async [T.MomentListItem] {
     MomentsLib.listMomentsForUser(momentsState, caller, caller);
   };
 
-  // Returns all moments the caller is associated with for calendar display.
-  // Includes owned moments (callerRelation = #owned), moments with approved access,
-  // and any moment the caller has RSVP'd to (callerRelation = #rsvp <status>).
-  // Use callerRelation to color-differentiate on the calendar.
-  public query ({ caller }) func getMyCalendarMoments() : async [T.MomentListItem] {
-    MomentsLib.listCalendarMomentsForUser(momentsState, caller);
+  // Returns all moments the caller is associated with for calendar display within a date range.
+  // Recurring moments are expanded into virtual occurrences within [rangeStart, rangeEnd].
+  // Each occurrence has occurrenceDate set; callerRelation differentiates owned vs RSVP'd moments.
+  public query ({ caller }) func getMyCalendarMoments(
+    rangeStart : Common.Timestamp,
+    rangeEnd : Common.Timestamp
+  ) : async [T.MomentListItem] {
+    MomentsLib.listCalendarMomentsForUser(momentsState, caller, rangeStart, rangeEnd);
   };
 
   public query ({ caller }) func getFeedMoments() : async [T.MomentListItem] {
@@ -137,6 +165,16 @@ mixin (
     MomentsLib.getAttendanceInfo(momentsState, usersState, caller, momentId);
   };
 
+  // Public endpoint: returns attendance info for any user+moment combination.
+  // No authentication required — callable by anonymous users (e.g. QR code scanners).
+  // Returns #err if the moment or attendee record does not exist.
+  public query func getEventPassInfo(momentId : Common.MomentId, userId : Common.UserId) : async { #ok : T.AttendanceInfo; #err : Text } {
+    switch (MomentsLib.getAttendanceInfo(momentsState, usersState, userId, momentId)) {
+      case null #err("Attendance record not found");
+      case (?info) #ok(info);
+    };
+  };
+
   // ── Admin ─────────────────────────────────────────────────────────────────
   public query ({ caller }) func adminListMoments() : async [T.MomentListItem] {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
@@ -153,15 +191,76 @@ mixin (
     MediaLib.deleteMomentData(mediaState, momentId);
   };
 
+  public shared ({ caller }) func adminDeleteAllMoments() : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: admin only");
+    };
+    MomentsLib.adminDeleteAllMoments(momentsState);
+  };
+
   // Bulk import moments from a structured row list (e.g. parsed from CSV on frontend).
   // Each row is validated; required fields are title and startDate.
   // Invalid rows are collected in BulkImportResult.errors; valid rows are created.
   // visibility field: "public" → #public_, "private" → #private_, invalid → defaults to #public_.
+  // coverImageUrl field: when provided, the image is fetched via http-outcall and stored.
+  //   If fetch fails, the moment is still created but a warning is added for that row.
+  // This cover image fetch logic ONLY runs in this admin import function — normal createMoment
+  // is completely unaffected.
   public shared ({ caller }) func adminBulkImportMoments(rows : [T.BulkImportMomentRow]) : async T.BulkImportResult {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: admin only");
     };
-    let result = MomentsLib.adminBulkImport(momentsState, caller, rows);
-    result;
+
+    // IC management canister for http_request
+    let ic = actor "aaaaa-aa" : actor {
+      http_request : ({
+        url : Text;
+        max_response_bytes : ?Nat64;
+        method : { #get; #head; #post };
+        headers : [{ name : Text; value : Text }];
+        body : ?Blob;
+        transform : ?{
+          function : shared query ({ response : { status : Nat; headers : [{ name : Text; value : Text }]; body : Blob }; context : Blob }) -> async { status : Nat; headers : [{ name : Text; value : Text }]; body : Blob };
+          context : Blob;
+        };
+        is_replicated : ?Bool;
+      }) -> async { status : Nat; headers : [{ name : Text; value : Text }]; body : Blob };
+    };
+
+    // Fetch cover image blobs in sequence — one http-outcall per row that has a coverImageUrl
+    let coverImageBlobs = List.empty<?Blob>();
+    for (row in rows.values()) {
+      switch (row.coverImageUrl) {
+        case (?url) {
+          if (url != "") {
+            try {
+              let response = await (with cycles = 1_000_000_000) ic.http_request({
+                url;
+                max_response_bytes = ?2_097_152; // 2 MB cap
+                method = #get;
+                headers = [];
+                body = null;
+                transform = null;
+                is_replicated = ?false;
+              });
+              if (response.status >= 200 and response.status < 300 and response.body.size() > 0) {
+                coverImageBlobs.add(?response.body);
+              } else {
+                coverImageBlobs.add(null);
+              };
+            } catch (_) {
+              coverImageBlobs.add(null);
+            };
+          } else {
+            coverImageBlobs.add(null);
+          };
+        };
+        case null {
+          coverImageBlobs.add(null);
+        };
+      };
+    };
+
+    MomentsLib.adminBulkImport(momentsState, caller, rows, coverImageBlobs.toArray());
   };
 };

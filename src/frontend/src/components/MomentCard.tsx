@@ -1,6 +1,6 @@
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Calendar, Globe, Lock, MapPin, Users } from "lucide-react";
+import { useState } from "react";
 import { Visibility } from "../types";
 import type { MomentListItem } from "../types";
 
@@ -27,12 +27,9 @@ export function isPrivateVisibility(
   visibility: Visibility | Record<string, null> | unknown,
 ): boolean {
   if (!visibility) return false;
-  // TypeScript enum string match: Visibility.private_ === "private"
   if (visibility === Visibility.private_) return true;
   if (typeof visibility === "object" && visibility !== null) {
-    // Raw Candid variant with underscore suffix: {private_: null}
     if ("private_" in visibility) return true;
-    // Patched encoding without underscore: {private: null}
     if ("private" in visibility) return true;
   }
   return false;
@@ -42,11 +39,18 @@ interface MomentCardProps {
   moment: MomentListItem;
   onClick?: () => void;
   className?: string;
+  index?: number;
 }
 
-export function MomentCard({ moment, onClick, className }: MomentCardProps) {
+export function MomentCard({
+  moment,
+  onClick,
+  className,
+  index: _index = 0,
+}: MomentCardProps) {
   const isPrivate = isPrivateVisibility(moment.visibility);
   const coverUrl = moment.coverImage?.getDirectURL();
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   return (
     <div
@@ -65,36 +69,50 @@ export function MomentCard({ moment, onClick, className }: MomentCardProps) {
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       className={cn(
-        "group card-elevated overflow-hidden transition-all duration-200",
+        "group relative overflow-hidden rounded-2xl",
+        "glass-card",
         onClick &&
-          "cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] active:translate-y-0",
+          "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]",
         className,
       )}
     >
-      {/* Cover image */}
-      <div className="relative w-full aspect-video bg-muted overflow-hidden">
+      {/* Cover image — natural aspect ratio */}
+      <div className="relative w-full overflow-hidden">
         {coverUrl ? (
-          <img
-            src={coverUrl}
-            alt={moment.title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-          />
+          <>
+            {/* Blur placeholder shown until image loads */}
+            {!imgLoaded && (
+              <div className="w-full h-40 animate-shimmer rounded-t-2xl" />
+            )}
+            <img
+              src={coverUrl}
+              alt={moment.title}
+              loading="lazy"
+              onLoad={() => setImgLoaded(true)}
+              className={cn(
+                "w-full h-auto object-cover",
+                imgLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
+              )}
+            />
+          </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-secondary/60">
+          <div className="w-full h-36 flex items-center justify-center bg-muted/40">
             <Calendar
-              className="w-8 h-8 text-muted-foreground/50"
+              className="w-8 h-8 text-muted-foreground/40"
               strokeWidth={1.5}
             />
           </div>
         )}
-        {/* Visibility badge */}
-        <div className="absolute top-2.5 left-2.5">
+
+        {/* Visibility badge — top right, absolute */}
+        <div className="absolute top-2.5 right-2.5 z-10">
           <div
             className={cn(
-              "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm",
+              "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+              "backdrop-blur-md",
               isPrivate
-                ? "bg-foreground/80 text-primary-foreground"
-                : "bg-background/80 text-foreground border border-border/50",
+                ? "bg-foreground/70 text-primary-foreground border border-white/10"
+                : "bg-background/70 text-foreground border border-white/20",
             )}
           >
             {isPrivate ? (
@@ -107,57 +125,62 @@ export function MomentCard({ moment, onClick, className }: MomentCardProps) {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-4 space-y-2.5">
-        <h3 className="font-display font-semibold text-foreground text-[15px] leading-snug line-clamp-2 group-hover:text-foreground/80 transition-colors">
+      {/* Glass overlay at bottom — gradient fade from transparent to glass */}
+      <div className="relative px-3 pb-3 pt-2">
+        {/* Gradient connector between image and content */}
+        {coverUrl && (
+          <div
+            className="absolute -top-6 left-0 right-0 h-6 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent, var(--card-overlay, rgba(0,0,0,0)))",
+            }}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Title */}
+        <h3 className="font-display font-semibold text-foreground text-[14px] leading-snug line-clamp-2 mb-1.5">
           {moment.title}
         </h3>
 
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Calendar className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+        {/* Metadata row */}
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Calendar className="w-3 h-3 flex-shrink-0" strokeWidth={1.5} />
             <span className="font-body">
               {formatEventDate(moment.eventDate)}
             </span>
           </div>
           {moment.location && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <MapPin className="w-3 h-3 flex-shrink-0" strokeWidth={1.5} />
               <span className="font-body truncate">{moment.location}</span>
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Users className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Users className="w-3 h-3 flex-shrink-0" strokeWidth={1.5} />
             <span className="font-body">
               {moment.attendeeCount.toString()} attending
             </span>
           </div>
         </div>
 
-        {moment.description && (
-          <p className="text-[13px] text-muted-foreground font-body line-clamp-2 leading-relaxed">
-            {moment.description}
-          </p>
-        )}
-
+        {/* Tags */}
         {moment.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-0.5">
+          <div className="flex flex-wrap gap-1 mt-2">
             {moment.tags.slice(0, 3).map((tag) => (
-              <Badge
+              <span
                 key={tag}
-                variant="secondary"
-                className="text-[10px] font-body px-1.5 py-0.5 rounded-full h-auto"
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-body font-medium bg-accent/15 text-accent border border-accent/20"
               >
                 #{tag}
-              </Badge>
+              </span>
             ))}
             {moment.tags.length > 3 && (
-              <Badge
-                variant="secondary"
-                className="text-[10px] font-body px-1.5 py-0.5 rounded-full h-auto"
-              >
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-body bg-muted/60 text-muted-foreground">
                 +{moment.tags.length - 3}
-              </Badge>
+              </span>
             )}
           </div>
         )}

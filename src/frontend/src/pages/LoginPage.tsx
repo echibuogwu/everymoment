@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
+import { motion } from "motion/react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef } from "react";
 import { LoadingSpinner } from "../components/LoadingSpinner";
@@ -14,7 +15,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+      className="flex items-center justify-center w-10 h-10 rounded-full glass-card transition-smooth text-muted-foreground hover:text-foreground"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
       <Sun className="w-4 h-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -30,28 +31,15 @@ export function LoginPage() {
   const { hasProfile, isLoading: isProfileLoading } = useProfile();
   const navigate = useNavigate();
 
-  // Track if we've ever started a redirect to avoid double-navigates
   const redirectingRef = useRef(false);
 
-  /**
-   * Redirect logic — fires whenever auth/actor/profile state changes.
-   *
-   * Gate order:
-   *   1. Still initializing → wait
-   *   2. Not authenticated → stay on login page (show UI)
-   *   3. Authenticated but actor not ready → wait
-   *   4. Authenticated + actor ready but profile query still loading → wait
-   *   5. All settled → redirect to /dashboard or /onboarding
-   */
   useEffect(() => {
     if (isInitializing) return;
     if (!isAuthenticated) return;
     if (!actor) return;
     if (isProfileLoading) return;
     if (redirectingRef.current) return;
-
     redirectingRef.current = true;
-
     if (hasProfile) {
       navigate({ to: "/dashboard" });
     } else {
@@ -66,27 +54,15 @@ export function LoginPage() {
     navigate,
   ]);
 
-  // Reset redirect flag if we end up back on login page unauthenticated
   useEffect(() => {
     if (!isAuthenticated && !isInitializing) {
       redirectingRef.current = false;
     }
   }, [isAuthenticated, isInitializing]);
 
-  /**
-   * Show a full-screen spinner while:
-   *   - II is checking for an existing session on page load (isInitializing)
-   *   - User is authenticated (we'll redirect them — don't show the login UI)
-   *
-   * This prevents the "already authenticated" error by never showing
-   * the Sign In button to an authenticated user.
-   */
   if (isInitializing || isAuthenticated) {
     return <LoadingSpinner fullScreen />;
   }
-
-  // ── At this point: isInitializing=false, isAuthenticated=false ──
-  // Show the login UI.
 
   const hasRealError = !!loginError;
   const errorMessage = loginError
@@ -97,11 +73,21 @@ export function LoginPage() {
 
   return (
     <div
-      className="min-h-screen bg-background flex flex-col"
+      className="min-h-screen gradient-bg relative overflow-hidden flex flex-col"
       data-ocid="login-page"
     >
+      {/* Decorative orbs */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden z-0"
+      >
+        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-accent/20 blur-[120px] opacity-60" />
+        <div className="absolute -bottom-24 -right-24 w-[400px] h-[400px] rounded-full bg-accent/15 blur-[100px] opacity-50" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-primary/10 blur-[80px] opacity-40" />
+      </div>
+
       {/* Top bar */}
-      <header className="px-5 pt-5 flex items-center justify-between">
+      <header className="relative z-10 px-5 pt-5 flex items-center justify-between">
         <span className="font-display font-semibold text-sm tracking-widest uppercase text-muted-foreground select-none">
           EveryMoment
         </span>
@@ -109,153 +95,176 @@ export function LoginPage() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-5 py-10">
-        {/* Visual mark */}
-        <div className="mb-8 flex items-center justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-foreground flex items-center justify-center shadow-lg">
-            <svg
-              width="30"
-              height="30"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
-                fill="oklch(var(--primary-foreground))"
-                fillOpacity="0.15"
-              />
-              <circle
-                cx="12"
-                cy="8"
-                r="2.5"
-                fill="oklch(var(--primary-foreground))"
-              />
-              <path
-                d="M7 18c0-2.76 2.24-5 5-5s5 2.24 5 5"
-                stroke="oklch(var(--primary-foreground))"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        {/* Wordmark */}
-        <div className="mb-10 text-center space-y-2.5">
-          <h1 className="font-display font-bold text-4xl sm:text-5xl leading-none tracking-tight text-foreground">
-            Every<span className="opacity-40">M</span>oment
-          </h1>
-          <p className="text-sm text-muted-foreground font-body max-w-[260px] leading-relaxed">
-            Capture, organize, and share your most meaningful memories.
-          </p>
-        </div>
-
-        {/* Auth card */}
-        <div className="w-full max-w-[320px] bg-card border border-border rounded-2xl p-6 shadow-sm">
-          <p className="text-[13px] font-body text-muted-foreground text-center mb-5 leading-snug">
-            Sign in with Internet Identity to get started
-          </p>
-
-          {/* Sign-in button — NEVER permanently disabled */}
-          <button
-            type="button"
-            onClick={login}
-            disabled={isLoggingIn}
-            data-ocid="login-btn"
-            aria-label={
-              hasRealError
-                ? "Try signing in again"
-                : "Sign in with Internet Identity"
-            }
-            className="w-full flex items-center justify-center gap-2.5 bg-foreground text-background rounded-xl px-5 py-3.5 font-body font-semibold text-sm transition-all duration-200 hover:opacity-90 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[46px]"
-          >
-            {isLoggingIn ? (
-              <>
-                <div
-                  className="w-4 h-4 rounded-full border-2 border-background/30 border-t-background animate-spin"
-                  role="status"
-                  aria-label="Connecting"
-                />
-                <span>Connecting…</span>
-              </>
-            ) : (
-              <>
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 py-10">
+        <motion.div
+          className="w-full max-w-sm"
+          initial={{ opacity: 0, scale: 0.88, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 28,
+            delay: 0.05,
+          }}
+        >
+          <div className="glass-card rounded-3xl p-8 space-y-6">
+            {/* Brand */}
+            <div className="text-center space-y-3">
+              {/* Logo mark */}
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent/60 flex items-center justify-center shadow-lg glow-accent-sm">
                 <svg
-                  width="17"
-                  height="17"
+                  width="30"
+                  height="30"
                   viewBox="0 0 24 24"
                   fill="none"
                   aria-hidden="true"
-                  className="flex-shrink-0"
                 >
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="9.5"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                  />
-                  <ellipse
-                    cx="12"
-                    cy="12"
-                    rx="3.8"
-                    ry="9.5"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                  />
                   <path
-                    d="M2.5 12h19"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+                    fill="white"
+                    fillOpacity="0.2"
                   />
+                  <circle cx="12" cy="8" r="2.5" fill="white" />
                   <path
-                    d="M4 7.5h16M4 16.5h16"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
+                    d="M7 18c0-2.76 2.24-5 5-5s5 2.24 5 5"
+                    stroke="white"
+                    strokeWidth="1.8"
                     strokeLinecap="round"
                   />
                 </svg>
-                <span>
-                  {hasRealError
-                    ? "Try again"
-                    : "Sign in with Internet Identity"}
-                </span>
-              </>
-            )}
-          </button>
+              </div>
 
-          {hasRealError && errorMessage && (
-            <p
-              className="mt-3 text-center text-[11px] text-destructive font-body leading-relaxed"
-              role="alert"
-              data-ocid="login-error-msg"
-            >
-              {errorMessage}
-            </p>
-          )}
+              <div>
+                <h1 className="font-display font-bold text-3xl tracking-tight text-gradient-accent">
+                  EveryMoment
+                </h1>
+                <p className="text-sm text-muted-foreground font-body mt-1.5 leading-relaxed max-w-[240px] mx-auto">
+                  Capture, organize, and share your most meaningful memories.
+                </p>
+              </div>
+            </div>
 
-          {!hasRealError && (
-            <p className="mt-4 text-center text-[11px] text-muted-foreground font-body leading-relaxed">
-              Passwordless &amp; secure — no email or password needed.
-            </p>
-          )}
-        </div>
+            {/* Divider */}
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-        {/* Feature hints */}
-        <div className="mt-10 flex items-center gap-6 text-[11px] text-muted-foreground font-body">
-          {["Capture", "Organize", "Share"].map((label) => (
-            <span key={label} className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-muted-foreground/40 inline-block" />
-              {label}
-            </span>
-          ))}
-        </div>
+            {/* Auth section */}
+            <div className="space-y-4">
+              <p className="text-[13px] font-body text-muted-foreground text-center leading-snug">
+                Sign in with Internet Identity to get started
+              </p>
+
+              <motion.button
+                type="button"
+                onClick={login}
+                disabled={isLoggingIn}
+                data-ocid="login-btn"
+                aria-label={
+                  hasRealError
+                    ? "Try signing in again"
+                    : "Sign in with Internet Identity"
+                }
+                className="w-full flex items-center justify-center gap-2.5 rounded-full px-5 py-3.5 font-body font-semibold text-sm min-h-[48px] glow-accent disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-white"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.65 0.25 280), oklch(0.55 0.28 290))",
+                }}
+                whileTap={{ scale: 0.96 }}
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              >
+                {isLoggingIn ? (
+                  <>
+                    <div
+                      className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"
+                      role="status"
+                      aria-label="Connecting"
+                    />
+                    <span>Connecting…</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="17"
+                      height="17"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden="true"
+                      className="flex-shrink-0"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9.5"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      />
+                      <ellipse
+                        cx="12"
+                        cy="12"
+                        rx="3.8"
+                        ry="9.5"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      />
+                      <path
+                        d="M2.5 12h19"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M4 7.5h16M4 16.5h16"
+                        stroke="currentColor"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <span>
+                      {hasRealError
+                        ? "Try again"
+                        : "Sign in with Internet Identity"}
+                    </span>
+                  </>
+                )}
+              </motion.button>
+
+              {hasRealError && errorMessage && (
+                <p
+                  className="text-center text-[11px] text-destructive font-body leading-relaxed"
+                  role="alert"
+                  data-ocid="login-error-msg"
+                >
+                  {errorMessage}
+                </p>
+              )}
+
+              {!hasRealError && (
+                <p className="text-center text-[11px] text-muted-foreground font-body leading-relaxed">
+                  🔒 Passwordless &amp; secure — no email or password needed.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Feature pills */}
+          <div className="mt-6 flex items-center justify-center gap-4">
+            {["Capture", "Organize", "Share"].map((label, i) => (
+              <motion.span
+                key={label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + i * 0.08 }}
+                className="px-3 py-1 glass-card rounded-full text-[11px] font-body text-muted-foreground"
+              >
+                {label}
+              </motion.span>
+            ))}
+          </div>
+        </motion.div>
       </main>
 
       {/* Footer */}
-      <footer className="py-5 text-center">
+      <footer className="relative z-10 py-5 text-center">
         <p className="text-[11px] text-muted-foreground font-body">
           © {new Date().getFullYear()}.{" "}
           <a

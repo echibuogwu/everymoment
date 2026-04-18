@@ -15,20 +15,24 @@
  * FIX STRATEGY:
  * - Encoder: override createMoment / updateMoment on Backend.prototype and call the
  *   raw IDL actor directly with correct Candid variant objects {public:null} / {private:null}.
+ *   Also encode `recurrence` manually since the patched encoder bypasses the SDK converter.
  * - Decoder: override each moment-returning method. Temporarily wrap the raw actor call
- *   to capture the Candid visibility value BEFORE the broken decoder runs, then
- *   overwrite visibility in the decoded result with the correct Visibility enum value.
- *   This is exactly one network call per method — no double-fetching.
+ *   to capture the Candid visibility value BEFORE the broken decoder converts it to `undefined`.
+ *   After the original Backend method returns (decoded result), overwrite visibility with
+ *   the captured value. This is exactly one network call per method — no double-fetching.
  */
-import { Backend, Visibility } from "../backend";
+import { Backend, RecurrenceFrequency, Visibility } from "../backend";
 import type {
   CreateMomentInput,
   MomentDetail,
   MomentId,
   MomentListItem,
+  RecurrenceRule,
   UpdateMomentInput,
   UserId,
 } from "../types";
+
+// ─── Visibility helpers ────────────────────────────────────────────────────────
 
 /** Convert a Visibility enum value to the correct Candid wire format */
 function encodeVisibility(v: Visibility): { public: null } | { private: null } {
@@ -43,13 +47,65 @@ function decodeVisibility(
   return Visibility.public_;
 }
 
+// ─── Recurrence helpers ───────────────────────────────────────────────────────
+
+type RawRecurrenceFrequency =
+  | { monthly: null }
+  | { yearly: null }
+  | { daily: null }
+  | { weekly: null };
+
+type RawRecurrenceEndCondition =
+  | { never: null }
+  | { count: bigint }
+  | { endDate: bigint };
+
+interface RawRecurrenceRule {
+  frequency: RawRecurrenceFrequency;
+  interval: bigint;
+  daysOfWeek: bigint[];
+  endCondition: RawRecurrenceEndCondition;
+}
+
+function encodeFrequency(f: RecurrenceFrequency): RawRecurrenceFrequency {
+  if (f === RecurrenceFrequency.monthly) return { monthly: null };
+  if (f === RecurrenceFrequency.yearly) return { yearly: null };
+  if (f === RecurrenceFrequency.daily) return { daily: null };
+  return { weekly: null };
+}
+
+function encodeEndCondition(
+  ec: RecurrenceRule["endCondition"],
+): RawRecurrenceEndCondition {
+  if (ec.__kind__ === "count") return { count: ec.count };
+  if (ec.__kind__ === "endDate") return { endDate: ec.endDate };
+  return { never: null };
+}
+
+function encodeRecurrenceRule(rule: RecurrenceRule): RawRecurrenceRule {
+  return {
+    frequency: encodeFrequency(rule.frequency),
+    interval: rule.interval,
+    daysOfWeek: rule.daysOfWeek,
+    endCondition: encodeEndCondition(rule.endCondition),
+  };
+}
+
+function encodeOptRecurrence(
+  rule: RecurrenceRule | undefined,
+): [] | [RawRecurrenceRule] {
+  return rule !== undefined ? [encodeRecurrenceRule(rule)] : [];
+}
+
+// ─── Patch application ─────────────────────────────────────────────────────────
+
 let _patched = false;
 
 export function applyBackendPatches() {
   if (_patched) return;
   _patched = true;
 
-  // ─── ENCODER PATCHES ────────────────────────────────────────────────────────
+  // ─── ENCODER PATCHES ──────────────────────────────────────────────────────────
 
   const origCreate = Backend.prototype.createMoment;
   const origUpdate = Backend.prototype.updateMoment;
@@ -82,6 +138,7 @@ export function applyBackendPatches() {
       eventDate: input.eventDate,
       locationLat: input.locationLat !== undefined ? [input.locationLat] : [],
       locationLng: input.locationLng !== undefined ? [input.locationLng] : [],
+      recurrence: encodeOptRecurrence(input.recurrence),
     });
   };
 
@@ -114,10 +171,11 @@ export function applyBackendPatches() {
       eventDate: input.eventDate,
       locationLat: input.locationLat !== undefined ? [input.locationLat] : [],
       locationLng: input.locationLng !== undefined ? [input.locationLng] : [],
+      recurrence: encodeOptRecurrence(input.recurrence),
     });
   };
 
-  // ─── DECODER PATCHES ────────────────────────────────────────────────────────
+  // ─── DECODER PATCHES ──────────────────────────────────────────────────────────
   // Strategy: temporarily wrap the raw actor method to capture the Candid visibility
   // value before the broken decoder converts it to `undefined`. After the original
   // Backend method returns (decoded result), overwrite visibility with the captured value.
@@ -142,14 +200,12 @@ export function applyBackendPatches() {
     const rawActor = self.actor;
     if (!rawActor) return origMethod.apply(self, args);
 
-    // Capture raw Candid results indexed by id
     const capturedMap = new Map<string, { public: null } | { private: null }>();
     const originalRaw = rawActor[methodName];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rawActor[methodName] = async (...rawArgs: any[]) => {
       const result = await originalRaw.apply(rawActor, rawArgs);
-      // Raw result is an array of Candid-decoded MomentListItem objects
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (Array.isArray(result)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,8 +234,8 @@ export function applyBackendPatches() {
   Backend.prototype.getMyMoments = async function (): Promise<
     MomentListItem[]
   > {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return withCapturedListVisibilities(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this as any,
       "getMyMoments",
       origGetMyMoments,
@@ -190,8 +246,8 @@ export function applyBackendPatches() {
   Backend.prototype.getFeedMoments = async function (): Promise<
     MomentListItem[]
   > {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return withCapturedListVisibilities(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this as any,
       "getFeedMoments",
       origGetFeedMoments,
@@ -199,7 +255,6 @@ export function applyBackendPatches() {
     );
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Backend.prototype.getMomentsForUser = async function (
     userId: UserId,
   ): Promise<MomentListItem[]> {
@@ -215,15 +270,30 @@ export function applyBackendPatches() {
   Backend.prototype.searchMoments = async function (
     searchText: string | null,
     tags: string[],
+    dateRangeStart: bigint | null,
+    dateRangeEnd: bigint | null,
+    locationLat: number | null,
+    locationLng: number | null,
+    radiusKm: number | null,
     offset: bigint,
     limit: bigint,
   ): Promise<MomentListItem[]> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return withCapturedListVisibilities(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this as any,
       "searchMoments",
       origSearchMoments,
-      [searchText, tags, offset, limit],
+      [
+        searchText,
+        tags,
+        dateRangeStart,
+        dateRangeEnd,
+        locationLat,
+        locationLng,
+        radiusKm,
+        offset,
+        limit,
+      ],
     );
   };
 
@@ -253,7 +323,6 @@ export function applyBackendPatches() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rawActor.getMomentDetail = async (...args: any[]) => {
       const result = await originalRaw.apply(rawActor, args);
-      // Raw result is [] | [RawMomentDetail]
       if (Array.isArray(result) && result.length > 0 && result[0]?.visibility) {
         capturedVisibility = result[0].visibility;
       }

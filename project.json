@@ -1,26 +1,28 @@
 {
-  "overview": "EveryMoment is a mobile-first web app for capturing, organizing, and sharing event-centric memories. Users create Moments (weddings, parties, milestones) where media, people, and interactions are organized together, with robust access control for both public and private experiences.",
+  "overview": "EveryMoment is a mobile-first web app for capturing, organizing, and sharing event-centric memories. Users create Moments (weddings, parties, milestones) where media, people, and interactions come together in one beautiful, immersive place. Features a Liquid Glass UI with cinematic animations, masonry explore grid, and seamless social features.",
   "features": [
+    "Liquid Glass UI with glass morphism cards and parallax scroll",
+    "Pinterest-style masonry Explore page with infinite scroll",
+    "Cinematic moment detail with full-bleed hero and animated tabs",
+    "Conversation-style Memories feed with full media support",
+    "Calendar view with glass pill toggles and day drawer",
     "Internet Identity passwordless authentication",
-    "Create and manage public or private Moments with UUID sharing",
-    "Calendar view with day/week/30-day toggle showing own and followed users' moments",
-    "Memories tab — conversation-style media and message feed for attending users",
-    "Event Pass QR modal for RSVP'd users",
-    "Editable profile with dynamic payment details",
-    "Advanced Explore filters with Near Me location search",
-    "Modern share modal with copy link and collapsible QR",
+    "Event Pass QR code for attending users",
+    "Advanced Explore filters with Near Me location detection",
+    "Recurring moments with rule-based recurrence",
     "Admin dashboard with CSV bulk import",
-    "OpenStreetMap location integration"
+    "Editable profile with dynamic payment details",
+    "Light/dark mode with animated glass theme toggle"
   ],
   "category": "social",
   "tags": [
     "events",
     "memories",
     "social",
-    "media-sharing",
-    "calendar",
     "mobile-first",
-    "internet-identity"
+    "glass-ui",
+    "calendar",
+    "media-sharing"
   ],
-  "last_updated": "2026-04-14T13:16:05.905Z"
+  "last_updated": "2026-04-15T11:20:42.274Z"
 }

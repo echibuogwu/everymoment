@@ -1,14 +1,12 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import { useBackend } from "../hooks/use-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { showError, showSuccess } from "../lib/toast";
-import type { MomentId } from "../types";
+import type { AccessRequest, MomentId } from "../types";
 import { AccessStatus } from "../types";
-import type { AccessRequest } from "../types";
 
 interface AccessRequestsPanelProps {
   momentId: MomentId;
@@ -78,23 +76,29 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
     return (
       <div className="space-y-3 py-2" data-ocid="access-requests-panel">
         {[1, 2].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          <Skeleton
+            key={i}
+            className="h-16 w-full rounded-2xl animate-shimmer"
+          />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-5" data-ocid="access-requests-panel">
+    <div className="space-y-6" data-ocid="access-requests-panel">
       {/* Pending requests */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <Clock className="w-4 h-4 text-muted-foreground" />
+          <Clock className="w-4 h-4 text-accent" />
           <h3 className="font-display font-semibold text-sm text-foreground">
             Pending Requests
           </h3>
           {pending.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge
+              variant="secondary"
+              className="text-xs glass-card border-0 text-accent"
+            >
               {pending.length}
             </Badge>
           )}
@@ -109,7 +113,7 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
             {pending.map((req) => (
               <li
                 key={req.requester.toString()}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
+                className="glass-card rounded-2xl flex items-center justify-between gap-3 px-4 py-3 animate-slide-up"
                 data-ocid="access-request-row"
               >
                 <div className="min-w-0 flex-1">
@@ -121,9 +125,11 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  {/* Deny */}
+                  <button
+                    type="button"
+                    data-ocid="deny-request-btn"
+                    aria-label="Deny access"
                     onClick={() =>
                       resolveMutation.mutate({
                         requester: req.requester,
@@ -131,13 +137,15 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
                       })
                     }
                     disabled={resolveMutation.isPending}
-                    data-ocid="deny-request-btn"
-                    aria-label="Deny access"
+                    className="w-9 h-9 rounded-xl glass-card flex items-center justify-center text-destructive hover:bg-destructive/15 transition-smooth button-spring disabled:opacity-50"
                   >
-                    <XCircle className="w-3.5 h-3.5 text-destructive" />
-                  </Button>
-                  <Button
-                    size="sm"
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                  {/* Approve */}
+                  <button
+                    type="button"
+                    data-ocid="approve-request-btn"
+                    aria-label="Approve access"
                     onClick={() =>
                       resolveMutation.mutate({
                         requester: req.requester,
@@ -145,11 +153,10 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
                       })
                     }
                     disabled={resolveMutation.isPending}
-                    data-ocid="approve-request-btn"
-                    aria-label="Approve access"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white bg-accent glow-accent-sm hover:opacity-90 transition-smooth button-spring disabled:opacity-50"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </Button>
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
                 </div>
               </li>
             ))}
@@ -160,12 +167,15 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
       {/* Approved users */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
+          <CheckCircle2 className="w-4 h-4 text-accent" />
           <h3 className="font-display font-semibold text-sm text-foreground">
             Approved Access
           </h3>
           {approved.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge
+              variant="secondary"
+              className="text-xs glass-card border-0 text-accent"
+            >
               {approved.length}
             </Badge>
           )}
@@ -180,7 +190,7 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
             {approved.map((req) => (
               <li
                 key={req.requester.toString()}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
+                className="glass-card rounded-2xl flex items-center justify-between gap-3 px-4 py-3"
                 data-ocid="approved-user-row"
               >
                 <div className="min-w-0 flex-1">
@@ -193,16 +203,15 @@ export function AccessRequestsPanel({ momentId }: AccessRequestsPanelProps) {
                     </p>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
+                <button
+                  type="button"
+                  data-ocid="revoke-access-btn"
                   onClick={() => revokeMutation.mutate(req.requester)}
                   disabled={revokeMutation.isPending}
-                  data-ocid="revoke-access-btn"
-                  className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10 flex-shrink-0"
+                  className="glass-card rounded-xl px-3 py-1.5 text-xs font-body font-medium text-destructive hover:bg-destructive/15 transition-smooth button-spring disabled:opacity-50 flex-shrink-0"
                 >
                   Revoke
-                </Button>
+                </button>
               </li>
             ))}
           </ul>

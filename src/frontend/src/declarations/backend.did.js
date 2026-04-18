@@ -30,6 +30,7 @@ export const Timestamp = IDL.Int;
 export const BulkImportMomentRow = IDL.Record({
   'locationLat' : IDL.Opt(IDL.Float64),
   'locationLng' : IDL.Opt(IDL.Float64),
+  'coverImageUrl' : IDL.Opt(IDL.Text),
   'title' : IDL.Text,
   'endDate' : IDL.Opt(Timestamp),
   'maxAttendees' : IDL.Opt(IDL.Nat),
@@ -42,6 +43,7 @@ export const BulkImportMomentRow = IDL.Record({
 export const BulkImportResult = IDL.Record({
   'errors' : IDL.Vec(IDL.Record({ 'row' : IDL.Nat, 'message' : IDL.Text })),
   'successCount' : IDL.Nat,
+  'warnings' : IDL.Vec(IDL.Record({ 'row' : IDL.Nat, 'message' : IDL.Text })),
 });
 export const MomentId = IDL.Text;
 export const UserId = IDL.Principal;
@@ -63,6 +65,23 @@ export const Media = IDL.Record({
   'filename' : IDL.Text,
   'folderId' : FolderId,
   'uploadedBy' : UserId,
+});
+export const RecurrenceEndCondition = IDL.Variant({
+  'endDate' : Timestamp,
+  'count' : IDL.Nat,
+  'never' : IDL.Null,
+});
+export const RecurrenceFrequency = IDL.Variant({
+  'monthly' : IDL.Null,
+  'yearly' : IDL.Null,
+  'daily' : IDL.Null,
+  'weekly' : IDL.Null,
+});
+export const RecurrenceRule = IDL.Record({
+  'endCondition' : RecurrenceEndCondition,
+  'interval' : IDL.Nat,
+  'daysOfWeek' : IDL.Vec(IDL.Nat),
+  'frequency' : RecurrenceFrequency,
 });
 export const RsvpStatus = IDL.Variant({
   'maybe' : IDL.Null,
@@ -88,7 +107,9 @@ export const MomentListItem = IDL.Record({
   'createdAt' : Timestamp,
   'tags' : IDL.Vec(IDL.Text),
   'description' : IDL.Text,
+  'recurrence' : IDL.Opt(RecurrenceRule),
   'coverImage' : IDL.Opt(ExternalBlob),
+  'occurrenceDate' : IDL.Opt(Timestamp),
   'callerRelation' : IDL.Opt(CallerRelation),
   'visibility' : Visibility,
   'location' : IDL.Text,
@@ -126,12 +147,20 @@ export const CreateMomentInput = IDL.Record({
   'title' : IDL.Text,
   'tags' : IDL.Vec(IDL.Text),
   'description' : IDL.Text,
+  'recurrence' : IDL.Opt(RecurrenceRule),
   'coverImage' : IDL.Opt(ExternalBlob),
   'visibility' : Visibility,
   'location' : IDL.Text,
   'eventDate' : Timestamp,
 });
 export const MemoryId = IDL.Text;
+export const AttendanceInfo = IDL.Record({
+  'status' : IDL.Text,
+  'rsvpTime' : Timestamp,
+  'momentDate' : Timestamp,
+  'username' : IDL.Text,
+  'momentTitle' : IDL.Text,
+});
 export const MemoryMediaKind = IDL.Variant({
   'audio' : IDL.Null,
   'video' : IDL.Null,
@@ -171,19 +200,13 @@ export const MomentDetail = IDL.Record({
   'createdAt' : Timestamp,
   'tags' : IDL.Vec(IDL.Text),
   'description' : IDL.Text,
+  'recurrence' : IDL.Opt(RecurrenceRule),
   'coverImage' : IDL.Opt(ExternalBlob),
   'updatedAt' : Timestamp,
   'visibility' : Visibility,
   'isOwner' : IDL.Bool,
   'location' : IDL.Text,
   'eventDate' : Timestamp,
-});
-export const AttendanceInfo = IDL.Record({
-  'status' : IDL.Text,
-  'rsvpTime' : Timestamp,
-  'momentDate' : Timestamp,
-  'username' : IDL.Text,
-  'momentTitle' : IDL.Text,
 });
 export const Comment = IDL.Record({
   'id' : CommentId,
@@ -226,6 +249,7 @@ export const UpdateMomentInput = IDL.Record({
   'title' : IDL.Text,
   'tags' : IDL.Vec(IDL.Text),
   'description' : IDL.Text,
+  'recurrence' : IDL.Opt(RecurrenceRule),
   'coverImage' : IDL.Opt(ExternalBlob),
   'visibility' : Visibility,
   'location' : IDL.Text,
@@ -273,6 +297,7 @@ export const idlService = IDL.Service({
       [BulkImportResult],
       [],
     ),
+  'adminDeleteAllMoments' : IDL.Func([], [], []),
   'adminDeleteMedia' : IDL.Func([MediaId], [], []),
   'adminDeleteMoment' : IDL.Func([MomentId], [], []),
   'adminDeleteUser' : IDL.Func([UserId], [], []),
@@ -298,6 +323,11 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getEventPassInfo' : IDL.Func(
+      [MomentId, UserId],
+      [IDL.Variant({ 'ok' : AttendanceInfo, 'err' : IDL.Text })],
+      ['query'],
+    ),
   'getFeedMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
   'getFollowers' : IDL.Func([UserId], [IDL.Vec(UserProfilePublic)], ['query']),
   'getFollowing' : IDL.Func([UserId], [IDL.Vec(UserProfilePublic)], ['query']),
@@ -327,7 +357,11 @@ export const idlService = IDL.Service({
       [IDL.Opt(AttendanceInfo)],
       ['query'],
     ),
-  'getMyCalendarMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
+  'getMyCalendarMoments' : IDL.Func(
+      [Timestamp, Timestamp],
+      [IDL.Vec(MomentListItem)],
+      ['query'],
+    ),
   'getMyMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
   'getUserProfile' : IDL.Func(
       [UserId],
@@ -370,7 +404,17 @@ export const idlService = IDL.Service({
   'revokeMomentAccess' : IDL.Func([MomentId, UserId], [], []),
   'saveCallerUserProfile' : IDL.Func([SaveProfileInput], [], []),
   'searchMoments' : IDL.Func(
-      [IDL.Opt(IDL.Text), IDL.Vec(IDL.Text), IDL.Nat, IDL.Nat],
+      [
+        IDL.Opt(IDL.Text),
+        IDL.Vec(IDL.Text),
+        IDL.Opt(Timestamp),
+        IDL.Opt(Timestamp),
+        IDL.Opt(IDL.Float64),
+        IDL.Opt(IDL.Float64),
+        IDL.Opt(IDL.Float64),
+        IDL.Nat,
+        IDL.Nat,
+      ],
       [IDL.Vec(MomentListItem)],
       ['query'],
     ),
@@ -406,6 +450,7 @@ export const idlFactory = ({ IDL }) => {
   const BulkImportMomentRow = IDL.Record({
     'locationLat' : IDL.Opt(IDL.Float64),
     'locationLng' : IDL.Opt(IDL.Float64),
+    'coverImageUrl' : IDL.Opt(IDL.Text),
     'title' : IDL.Text,
     'endDate' : IDL.Opt(Timestamp),
     'maxAttendees' : IDL.Opt(IDL.Nat),
@@ -418,6 +463,7 @@ export const idlFactory = ({ IDL }) => {
   const BulkImportResult = IDL.Record({
     'errors' : IDL.Vec(IDL.Record({ 'row' : IDL.Nat, 'message' : IDL.Text })),
     'successCount' : IDL.Nat,
+    'warnings' : IDL.Vec(IDL.Record({ 'row' : IDL.Nat, 'message' : IDL.Text })),
   });
   const MomentId = IDL.Text;
   const UserId = IDL.Principal;
@@ -440,6 +486,23 @@ export const idlFactory = ({ IDL }) => {
     'folderId' : FolderId,
     'uploadedBy' : UserId,
   });
+  const RecurrenceEndCondition = IDL.Variant({
+    'endDate' : Timestamp,
+    'count' : IDL.Nat,
+    'never' : IDL.Null,
+  });
+  const RecurrenceFrequency = IDL.Variant({
+    'monthly' : IDL.Null,
+    'yearly' : IDL.Null,
+    'daily' : IDL.Null,
+    'weekly' : IDL.Null,
+  });
+  const RecurrenceRule = IDL.Record({
+    'endCondition' : RecurrenceEndCondition,
+    'interval' : IDL.Nat,
+    'daysOfWeek' : IDL.Vec(IDL.Nat),
+    'frequency' : RecurrenceFrequency,
+  });
   const RsvpStatus = IDL.Variant({
     'maybe' : IDL.Null,
     'notAttending' : IDL.Null,
@@ -461,7 +524,9 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Timestamp,
     'tags' : IDL.Vec(IDL.Text),
     'description' : IDL.Text,
+    'recurrence' : IDL.Opt(RecurrenceRule),
     'coverImage' : IDL.Opt(ExternalBlob),
+    'occurrenceDate' : IDL.Opt(Timestamp),
     'callerRelation' : IDL.Opt(CallerRelation),
     'visibility' : Visibility,
     'location' : IDL.Text,
@@ -496,12 +561,20 @@ export const idlFactory = ({ IDL }) => {
     'title' : IDL.Text,
     'tags' : IDL.Vec(IDL.Text),
     'description' : IDL.Text,
+    'recurrence' : IDL.Opt(RecurrenceRule),
     'coverImage' : IDL.Opt(ExternalBlob),
     'visibility' : Visibility,
     'location' : IDL.Text,
     'eventDate' : Timestamp,
   });
   const MemoryId = IDL.Text;
+  const AttendanceInfo = IDL.Record({
+    'status' : IDL.Text,
+    'rsvpTime' : Timestamp,
+    'momentDate' : Timestamp,
+    'username' : IDL.Text,
+    'momentTitle' : IDL.Text,
+  });
   const MemoryMediaKind = IDL.Variant({
     'audio' : IDL.Null,
     'video' : IDL.Null,
@@ -541,19 +614,13 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Timestamp,
     'tags' : IDL.Vec(IDL.Text),
     'description' : IDL.Text,
+    'recurrence' : IDL.Opt(RecurrenceRule),
     'coverImage' : IDL.Opt(ExternalBlob),
     'updatedAt' : Timestamp,
     'visibility' : Visibility,
     'isOwner' : IDL.Bool,
     'location' : IDL.Text,
     'eventDate' : Timestamp,
-  });
-  const AttendanceInfo = IDL.Record({
-    'status' : IDL.Text,
-    'rsvpTime' : Timestamp,
-    'momentDate' : Timestamp,
-    'username' : IDL.Text,
-    'momentTitle' : IDL.Text,
   });
   const Comment = IDL.Record({
     'id' : CommentId,
@@ -596,6 +663,7 @@ export const idlFactory = ({ IDL }) => {
     'title' : IDL.Text,
     'tags' : IDL.Vec(IDL.Text),
     'description' : IDL.Text,
+    'recurrence' : IDL.Opt(RecurrenceRule),
     'coverImage' : IDL.Opt(ExternalBlob),
     'visibility' : Visibility,
     'location' : IDL.Text,
@@ -643,6 +711,7 @@ export const idlFactory = ({ IDL }) => {
         [BulkImportResult],
         [],
       ),
+    'adminDeleteAllMoments' : IDL.Func([], [], []),
     'adminDeleteMedia' : IDL.Func([MediaId], [], []),
     'adminDeleteMoment' : IDL.Func([MomentId], [], []),
     'adminDeleteUser' : IDL.Func([UserId], [], []),
@@ -668,6 +737,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getEventPassInfo' : IDL.Func(
+        [MomentId, UserId],
+        [IDL.Variant({ 'ok' : AttendanceInfo, 'err' : IDL.Text })],
+        ['query'],
+      ),
     'getFeedMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
     'getFollowers' : IDL.Func(
         [UserId],
@@ -709,7 +783,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(AttendanceInfo)],
         ['query'],
       ),
-    'getMyCalendarMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
+    'getMyCalendarMoments' : IDL.Func(
+        [Timestamp, Timestamp],
+        [IDL.Vec(MomentListItem)],
+        ['query'],
+      ),
     'getMyMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
     'getUserProfile' : IDL.Func(
         [UserId],
@@ -756,7 +834,17 @@ export const idlFactory = ({ IDL }) => {
     'revokeMomentAccess' : IDL.Func([MomentId, UserId], [], []),
     'saveCallerUserProfile' : IDL.Func([SaveProfileInput], [], []),
     'searchMoments' : IDL.Func(
-        [IDL.Opt(IDL.Text), IDL.Vec(IDL.Text), IDL.Nat, IDL.Nat],
+        [
+          IDL.Opt(IDL.Text),
+          IDL.Vec(IDL.Text),
+          IDL.Opt(Timestamp),
+          IDL.Opt(Timestamp),
+          IDL.Opt(IDL.Float64),
+          IDL.Opt(IDL.Float64),
+          IDL.Opt(IDL.Float64),
+          IDL.Nat,
+          IDL.Nat,
+        ],
         [IDL.Vec(MomentListItem)],
         ['query'],
       ),

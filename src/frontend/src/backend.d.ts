@@ -20,6 +20,7 @@ export interface CreateMomentInput {
     title: string;
     tags: Array<string>;
     description: string;
+    recurrence?: RecurrenceRule;
     coverImage?: ExternalBlob;
     visibility: Visibility;
     location: string;
@@ -53,7 +54,9 @@ export interface MomentListItem {
     createdAt: Timestamp;
     tags: Array<string>;
     description: string;
+    recurrence?: RecurrenceRule;
     coverImage?: ExternalBlob;
+    occurrenceDate?: Timestamp;
     callerRelation?: CallerRelation;
     visibility: Visibility;
     location: string;
@@ -93,6 +96,7 @@ export interface UpdateMomentInput {
     title: string;
     tags: Array<string>;
     description: string;
+    recurrence?: RecurrenceRule;
     coverImage?: ExternalBlob;
     visibility: Visibility;
     location: string;
@@ -154,6 +158,10 @@ export interface BulkImportResult {
         message: string;
     }>;
     successCount: bigint;
+    warnings: Array<{
+        row: bigint;
+        message: string;
+    }>;
 }
 export interface CreateFolderInput {
     name: string;
@@ -179,6 +187,12 @@ export interface UploadMediaInput {
     filename: string;
     folderId: FolderId;
 }
+export interface RecurrenceRule {
+    endCondition: RecurrenceEndCondition;
+    interval: bigint;
+    daysOfWeek: Array<bigint>;
+    frequency: RecurrenceFrequency;
+}
 export interface MomentDetail {
     id: MomentId;
     locationLat?: number;
@@ -190,6 +204,7 @@ export interface MomentDetail {
     createdAt: Timestamp;
     tags: Array<string>;
     description: string;
+    recurrence?: RecurrenceRule;
     coverImage?: ExternalBlob;
     updatedAt: Timestamp;
     visibility: Visibility;
@@ -197,9 +212,20 @@ export interface MomentDetail {
     location: string;
     eventDate: Timestamp;
 }
+export type RecurrenceEndCondition = {
+    __kind__: "endDate";
+    endDate: Timestamp;
+} | {
+    __kind__: "count";
+    count: bigint;
+} | {
+    __kind__: "never";
+    never: null;
+};
 export interface BulkImportMomentRow {
     locationLat?: number;
     locationLng?: number;
+    coverImageUrl?: string;
     title: string;
     endDate?: Timestamp;
     maxAttendees?: bigint;
@@ -229,6 +255,12 @@ export enum MemoryMediaKind {
     video = "video",
     image = "image"
 }
+export enum RecurrenceFrequency {
+    monthly = "monthly",
+    yearly = "yearly",
+    daily = "daily",
+    weekly = "weekly"
+}
 export enum RsvpStatus {
     maybe = "maybe",
     notAttending = "notAttending",
@@ -246,6 +278,7 @@ export enum Visibility {
 export interface backendInterface {
     addComment(input: AddCommentInput): Promise<CommentId>;
     adminBulkImportMoments(rows: Array<BulkImportMomentRow>): Promise<BulkImportResult>;
+    adminDeleteAllMoments(): Promise<void>;
     adminDeleteMedia(mediaId: MediaId): Promise<void>;
     adminDeleteMoment(momentId: MomentId): Promise<void>;
     adminDeleteUser(userId: UserId): Promise<void>;
@@ -269,6 +302,13 @@ export interface backendInterface {
     followUser(target: UserId): Promise<void>;
     getCallerUserProfile(): Promise<UserProfilePublic | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getEventPassInfo(momentId: MomentId, userId: UserId): Promise<{
+        __kind__: "ok";
+        ok: AttendanceInfo;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     getFeedMoments(): Promise<Array<MomentListItem>>;
     getFollowers(userId: UserId): Promise<Array<UserProfilePublic>>;
     getFollowing(userId: UserId): Promise<Array<UserProfilePublic>>;
@@ -288,7 +328,7 @@ export interface backendInterface {
     getMomentShareUrl(momentId: MomentId): Promise<string>;
     getMomentsForUser(userId: UserId): Promise<Array<MomentListItem>>;
     getMyAttendanceInfo(momentId: MomentId): Promise<AttendanceInfo | null>;
-    getMyCalendarMoments(): Promise<Array<MomentListItem>>;
+    getMyCalendarMoments(rangeStart: Timestamp, rangeEnd: Timestamp): Promise<Array<MomentListItem>>;
     getMyMoments(): Promise<Array<MomentListItem>>;
     getUserProfile(userId: UserId): Promise<UserProfilePublic | null>;
     getUserProfileByUsername(username: string): Promise<UserProfilePublic | null>;
@@ -318,7 +358,7 @@ export interface backendInterface {
     resolveAccessRequest(momentId: MomentId, requester: UserId, approved: boolean): Promise<void>;
     revokeMomentAccess(momentId: MomentId, userId: UserId): Promise<void>;
     saveCallerUserProfile(input: SaveProfileInput): Promise<void>;
-    searchMoments(searchText: string | null, tags: Array<string>, offset: bigint, limit: bigint): Promise<Array<MomentListItem>>;
+    searchMoments(searchText: string | null, tags: Array<string>, dateRangeStart: Timestamp | null, dateRangeEnd: Timestamp | null, locationLat: number | null, locationLng: number | null, radiusKm: number | null, offset: bigint, limit: bigint): Promise<Array<MomentListItem>>;
     setRsvp(momentId: MomentId, status: RsvpStatus): Promise<void>;
     toggleLike(mediaId: MediaId): Promise<bigint>;
     unfollowUser(target: UserId): Promise<void>;

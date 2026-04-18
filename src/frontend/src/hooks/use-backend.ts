@@ -50,6 +50,7 @@ export interface BulkImportResult {
   title: string;
   success: boolean;
   error?: string;
+  warning?: string;
 }
 
 // ── useAdminBulkImportMoments ─────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export function useAdminBulkImportMoments() {
           maxAttendees: undefined,
           tags: tagList,
           visibility: vis,
+          coverImageUrl: row.coverImage ? row.coverImage : undefined,
         };
       });
 
@@ -111,18 +113,23 @@ export function useAdminBulkImportMoments() {
       const raw = await actor.adminBulkImportMoments(inputs);
       onProgress?.(rows.length, rows.length);
 
-      // Map backend errors (indexed by bigint row) into per-row results
+      // Map backend errors and warnings (indexed by bigint row) into per-row results
       const errorMap = new Map<number, string>(
         raw.errors.map((e) => [Number(e.row), e.message]),
+      );
+      const warningMap = new Map<number, string>(
+        (raw.warnings ?? []).map((w) => [Number(w.row), w.message]),
       );
 
       return rows.map((row, i) => {
         const errMsg = errorMap.get(i);
+        const warnMsg = warningMap.get(i);
         return {
           rowIndex: i,
           title: row.title,
           success: !errMsg,
           error: errMsg,
+          warning: warnMsg,
         };
       });
     },

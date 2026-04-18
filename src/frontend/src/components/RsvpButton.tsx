@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, HelpCircle, LogIn, X } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
@@ -25,25 +24,25 @@ const RSVP_OPTIONS: RsvpOption[] = [
     status: RsvpStatus.attending,
     label: "Attending",
     icon: Check,
-    activeClass: "bg-foreground text-background border-foreground",
+    activeClass: "bg-accent text-accent-foreground glow-accent-sm",
     inactiveClass:
-      "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
+      "glass-card text-muted-foreground hover:text-accent hover:border-accent/30",
   },
   {
     status: RsvpStatus.maybe,
     label: "Maybe",
     icon: HelpCircle,
-    activeClass: "bg-muted text-foreground border-foreground",
+    activeClass: "bg-yellow-400/20 text-yellow-500 border-yellow-400/40",
     inactiveClass:
-      "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
+      "glass-card text-muted-foreground hover:text-yellow-500 hover:border-yellow-400/30",
   },
   {
     status: RsvpStatus.notAttending,
     label: "Not Attending",
     icon: X,
-    activeClass: "bg-destructive/10 text-destructive border-destructive",
+    activeClass: "bg-destructive/20 text-destructive border-destructive/40",
     inactiveClass:
-      "border-border text-muted-foreground hover:border-destructive hover:text-destructive",
+      "glass-card text-muted-foreground hover:text-destructive hover:border-destructive/30",
   },
 ];
 
@@ -52,7 +51,6 @@ export function RsvpButton({ momentId }: RsvpButtonProps) {
   const { principal, isAuthenticated, login, isLoggingIn } = useAuth();
   const queryClient = useQueryClient();
 
-  // Derive current RSVP from attendees list
   const attendeesQuery = useQuery<Attendee[]>({
     queryKey: QUERY_KEYS.momentAttendees(momentId),
     queryFn: async () => {
@@ -74,7 +72,6 @@ export function RsvpButton({ momentId }: RsvpButtonProps) {
       return status;
     },
     onMutate: async (status: RsvpStatus) => {
-      // Optimistic update
       await queryClient.cancelQueries({
         queryKey: QUERY_KEYS.momentAttendees(momentId),
       });
@@ -135,25 +132,38 @@ export function RsvpButton({ momentId }: RsvpButtonProps) {
     },
   });
 
-  // Unauthenticated: prompt to sign in
+  // Unauthenticated state
   if (!isAuthenticated) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
+      <button
+        type="button"
+        data-ocid="rsvp-login-prompt"
         onClick={() => login()}
         disabled={isLoggingIn}
-        className="gap-2 tap-target font-body"
-        data-ocid="rsvp-login-prompt"
+        className="glass-card rounded-full flex items-center gap-2 px-4 py-2 text-sm font-body font-medium text-muted-foreground hover:text-foreground transition-smooth button-spring disabled:opacity-60 min-h-10"
       >
         <LogIn className="w-3.5 h-3.5" />
         {isLoggingIn ? "Signing in…" : "Sign in to RSVP"}
-      </Button>
+      </button>
+    );
+  }
+
+  // Loading shimmer
+  if (attendeesQuery.isLoading) {
+    return (
+      <div className="flex gap-2" data-ocid="rsvp-buttons">
+        {RSVP_OPTIONS.map(({ status }) => (
+          <div
+            key={status}
+            className="h-9 rounded-full animate-shimmer px-4 py-2 min-w-[80px]"
+          />
+        ))}
+      </div>
     );
   }
 
   return (
-    <div className="flex gap-2" data-ocid="rsvp-buttons">
+    <div className="flex gap-2 flex-wrap" data-ocid="rsvp-buttons">
       {RSVP_OPTIONS.map(
         ({ status, label, icon: Icon, activeClass, inactiveClass }) => {
           const isActive = currentRsvp === status;
@@ -165,7 +175,8 @@ export function RsvpButton({ momentId }: RsvpButtonProps) {
               disabled={rsvpMutation.isPending}
               data-ocid={`rsvp-${status}`}
               className={[
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-body font-medium transition-all tap-target",
+                "flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-body font-semibold",
+                "transition-smooth button-spring",
                 isActive ? activeClass : inactiveClass,
                 rsvpMutation.isPending
                   ? "opacity-60 cursor-not-allowed"

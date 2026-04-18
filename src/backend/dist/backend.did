@@ -52,6 +52,7 @@ type UpdateMomentInput =
    location: text;
    locationLat: opt float64;
    locationLng: opt float64;
+   recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
    visibility: Visibility;
@@ -77,6 +78,26 @@ type RsvpStatus =
    maybe;
    notAttending;
  };
+type RecurrenceRule = 
+ record {
+   daysOfWeek: vec nat;
+   endCondition: RecurrenceEndCondition;
+   frequency: RecurrenceFrequency;
+   interval: nat;
+ };
+type RecurrenceFrequency = 
+ variant {
+   daily;
+   monthly;
+   weekly;
+   yearly;
+ };
+type RecurrenceEndCondition = 
+ variant {
+   count: nat;
+   endDate: Timestamp;
+   never;
+ };
 type PaymentDetail = 
  record {
    name: text;
@@ -94,7 +115,9 @@ type MomentListItem =
    location: text;
    locationLat: opt float64;
    locationLng: opt float64;
+   occurrenceDate: opt Timestamp;
    owner: UserId;
+   recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
    visibility: Visibility;
@@ -114,6 +137,7 @@ type MomentDetail =
    locationLat: opt float64;
    locationLng: opt float64;
    owner: UserId;
+   recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
    updatedAt: Timestamp;
@@ -182,6 +206,7 @@ type CreateMomentInput =
    location: text;
    locationLat: opt float64;
    locationLng: opt float64;
+   recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
    visibility: Visibility;
@@ -214,9 +239,14 @@ type BulkImportResult =
                  row: nat;
                };
    successCount: nat;
+   warnings: vec record {
+                   message: text;
+                   row: nat;
+                 };
  };
 type BulkImportMomentRow = 
  record {
+   coverImageUrl: opt text;
    description: opt text;
    endDate: opt Timestamp;
    location: opt text;
@@ -278,6 +308,7 @@ service : {
   addComment: (input: AddCommentInput) -> (CommentId);
   adminBulkImportMoments: (rows: vec BulkImportMomentRow) ->
    (BulkImportResult);
+  adminDeleteAllMoments: () -> ();
   adminDeleteMedia: (mediaId: MediaId) -> ();
   adminDeleteMoment: (momentId: MomentId) -> ();
   adminDeleteUser: (userId: UserId) -> ();
@@ -298,6 +329,11 @@ service : {
   followUser: (target: UserId) -> ();
   getCallerUserProfile: () -> (opt UserProfilePublic) query;
   getCallerUserRole: () -> (UserRole) query;
+  getEventPassInfo: (momentId: MomentId, userId: UserId) ->
+   (variant {
+      err: text;
+      ok: AttendanceInfo;
+    }) query;
   getFeedMoments: () -> (vec MomentListItem) query;
   getFollowers: (userId: UserId) -> (vec UserProfilePublic) query;
   getFollowing: (userId: UserId) -> (vec UserProfilePublic) query;
@@ -315,7 +351,8 @@ service : {
   getMomentShareUrl: (momentId: MomentId) -> (text) query;
   getMomentsForUser: (userId: UserId) -> (vec MomentListItem) query;
   getMyAttendanceInfo: (momentId: MomentId) -> (opt AttendanceInfo) query;
-  getMyCalendarMoments: () -> (vec MomentListItem) query;
+  getMyCalendarMoments: (rangeStart: Timestamp, rangeEnd: Timestamp) ->
+   (vec MomentListItem) query;
   getMyMoments: () -> (vec MomentListItem) query;
   getUserProfile: (userId: UserId) -> (opt UserProfilePublic) query;
   getUserProfileByUsername: (username: text) -> (opt UserProfilePublic) query;
@@ -344,7 +381,9 @@ service : {
    bool) -> ();
   revokeMomentAccess: (momentId: MomentId, userId: UserId) -> ();
   saveCallerUserProfile: (input: SaveProfileInput) -> ();
-  searchMoments: (searchText: opt text, tags: vec text, offset: nat, limit:
+  searchMoments: (searchText: opt text, tags: vec text, dateRangeStart:
+   opt Timestamp, dateRangeEnd: opt Timestamp, locationLat: opt float64,
+   locationLng: opt float64, radiusKm: opt float64, offset: nat, limit:
    nat) -> (vec MomentListItem) query;
   setRsvp: (momentId: MomentId, status: RsvpStatus) -> ();
   toggleLike: (mediaId: MediaId) -> (nat);

@@ -4,6 +4,7 @@ import AccessControl "mo:caffeineai-authorization/access-control";
 import MomentsLib "../lib/moments";
 import MediaLib "../lib/media";
 import T "../types/media";
+import MomentsT "../types/moments";
 import Common "../types/common";
 
 mixin (
@@ -51,21 +52,44 @@ mixin (
   };
 
   // ── Media ─────────────────────────────────────────────────────────────────
+  // Upload permissions:
+  //   - Default (public) folder: any attending user OR the moment owner can upload.
+  //   - Non-default folders: only the moment owner can upload.
   public shared ({ caller }) func uploadMedia(input : T.UploadMediaInput) : async Common.MediaId {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Must be logged in");
     };
-    // Only moment owner can upload media
     let moment = switch (MomentsLib.getMoment(momentsState, input.momentId)) {
       case (?m) m;
       case null Runtime.trap("Moment not found");
     };
-    if (not Principal.equal(moment.owner, caller)) {
-      Runtime.trap("Unauthorized: Only the moment owner can upload media");
+    let folder = switch (mediaState.folders.get(input.folderId)) {
+      case (?f) f;
+      case null Runtime.trap("Folder not found");
+    };
+    if (folder.isDefault) {
+      // Allow moment owner or any attending user
+      if (not Principal.equal(moment.owner, caller)) {
+        let attendees = MomentsLib.listAttendees(momentsState, input.momentId);
+        let isAttending = attendees.any(func(att : MomentsT.Attendee) : Bool {
+          Principal.equal(att.userId, caller)
+        });
+        if (not isAttending) {
+          Runtime.trap("Unauthorized: Must be attending to upload to the public folder");
+        };
+      };
+    } else {
+      if (not Principal.equal(moment.owner, caller)) {
+        Runtime.trap("Unauthorized: Only the moment owner can upload to this folder");
+      };
     };
     MediaLib.uploadMedia(mediaState, caller, input);
   };
 
+  // Delete permissions:
+  //   - Moment owner can always delete any media in any folder.
+  //   - Default (public) folder: only the media uploader can delete their own media (unless owner).
+  //   - Non-default folders: only the moment owner can delete.
   public shared ({ caller }) func deleteMedia(mediaId : Common.MediaId) : async () {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Must be logged in");
@@ -74,15 +98,29 @@ mixin (
       case (?m) m;
       case null Runtime.trap("Media not found");
     };
-    // Owner of media or moment owner can delete
     let moment = switch (MomentsLib.getMoment(momentsState, item.momentId)) {
       case (?m) m;
       case null Runtime.trap("Moment not found");
     };
-    if (not Principal.equal(item.uploadedBy, caller) and not Principal.equal(moment.owner, caller)) {
-      Runtime.trap("Unauthorized: Only the uploader or moment owner can delete media");
+    // Moment owner can always delete anything
+    if (Principal.equal(moment.owner, caller)) {
+      MediaLib.adminDeleteMedia(mediaState, mediaId);
+      return;
     };
-    // Use adminDeleteMedia to bypass uploader-only check in deleteMedia
+    // Non-owner: look up the folder to determine rules
+    let folder = switch (mediaState.folders.get(item.folderId)) {
+      case (?f) f;
+      case null Runtime.trap("Folder not found");
+    };
+    if (folder.isDefault) {
+      // Default folder: only the uploader can delete their own media
+      if (not Principal.equal(item.uploadedBy, caller)) {
+        Runtime.trap("Unauthorized: Only the uploader can delete their own media from the public folder");
+      };
+    } else {
+      // Non-default folder: only the moment owner can delete (already handled above)
+      Runtime.trap("Unauthorized: Only the moment owner can delete media from this folder");
+    };
     MediaLib.adminDeleteMedia(mediaState, mediaId);
   };
 

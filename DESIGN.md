@@ -1,84 +1,93 @@
-# EveryMoment Design Brief
+# EveryMoment Design Brief — Liquid Glass
 
-## Tone & Aesthetic
-Editorial, minimalist. Dignified memory curation — focused on human moments, not interface chrome. Refined simplicity inspired by editorial photography: clean compositions, generous whitespace, content as the focal point.
+## Direction
+Liquid Glass meets Memory App — premium, immersive memory curation with fluid glass morphism surfaces, spring-physics interactions, and scroll-driven parallax that makes every interaction feel alive and connected to content.
+
+## Tone
+**Fluid, premium, intentional depth.** Every surface is glass — translucent, layered, with motion that guides attention. Inspired by Apple's 2025 Liquid Glass design language and Pinterest's addictive infinite flow. Dark mode focused, light mode carefully tuned for refined clarity.
+
+## Differentiation
+**Scroll reveals depth, not chrome.** Content scrolls behind glass surfaces, parallax cover images drift slower than the page, floating navigation adapts to scroll state. Memory moments feel like opening physical layered objects — not clicking buttons on a flat screen.
 
 ## Color Palette
-| Token | Light | Dark | Usage |
-|-------|-------|------|-------|
-| Background | `0.98 0 0` | `0.14 0 0` | Page canvas |
-| Foreground | `0.15 0 0` | `0.95 0 0` | Primary text |
-| Card | `0.99 0 0` | `0.18 0 0` | Media cards, containers |
-| Primary/Accent | `0.32 0 0` | `0.82 0 0` | Buttons, active states, CTAs (warm charcoal) |
-| Muted | `0.92 0 0` | `0.20 0 0` | Secondary backgrounds, disabled states |
-| Border | `0.88 0 0` | `0.25 0 0` | Subtle dividers, card edges |
-| Destructive | `0.54 0.18 22` | `0.65 0.18 22` | Removals, rejections (warm red) |
-| Success | `0.65 0.16 142` | `0.58 0.14 142` | RSVP confirmations (desaturated green) |
+| Token | OKLCH | Role |
+|-------|-------|------|
+| background | `0.08 0.02 280` / `0.97 0.008 85` | Page canvas — deep purple-to-black (dark) or warm pearl (light) |
+| foreground | `0.95 0.01 90` / `0.14 0.01 280` | Primary text — bright near-white (dark) or deep charcoal (light) |
+| card | `0.14 0.02 280` / `0.99 0.005 90` | Glass surfaces — frosted containers with 20px blur |
+| primary | `0.88 0.01 90` / `0.32 0.04 280` | CTAs, active states — bright on dark, warm charcoal on light |
+| accent | `0.72 0.28 280` / `0.65 0.25 280` | Electric indigo — glow, highlights, sparse accents only |
+| muted | `0.18 0.01 280` / `0.92 0.01 80` | Secondary backgrounds, disabled, subtle dividers |
+| destructive | `0.62 0.2 22` | Removals, rejections (red-orange) |
+| success | `0.56 0.15 142` | Confirmations, RSVPs (desaturated green) |
 
 ## Typography
-| Role | Font | Usage |
-|------|------|-------|
-| Display | General Sans (medium) | Moment titles, headings, hero text |
-| Body | DM Sans (regular) | UI labels, descriptions, system text |
-| Mono | Geist Mono | Timestamps, share links, technical info |
-
-## Spacing & Density
-- `--radius: 0.5rem` (8px) — cards, inputs, buttons (soft but not rounded)
-- Generous margins and padding (breathing room)
-- Touch targets: 48px minimum (mobile-first)
-- Card-based layouts with consistent gutters
+- Display: Space Grotesk — bold headlines, moment titles, hero text, high contrast
+- Body: Figtree — UI labels, descriptions, content (refined humanist sans)
+- Mono: Geist Mono — timestamps, share links, technical info
+- Scale: `text-display-xl` hero (5xl/7xl), `text-display-lg` sections (4xl/6xl), `text-display-md` subsections (3xl/5xl), `text-meta` labels (xs/sm uppercase), `text-body` paragraphs (base/lg)
 
 ## Elevation & Depth
-- **Header/Nav**: Sticky, subtle `bg-card` + `border-b` (light divider, no shadow)
-- **Main Content**: `bg-background` — open, breathable
-- **Cards**: `bg-card` with `1px border` in `oklch(var(--border))` — individual media cards are focal point
-- **Buttons**: Grayscale `bg-muted` on light, darker variants on dark; accent color on `:hover`/`:active`
-- **Sidebar**: Inherit from header or `bg-muted/20` for hierarchy
-- **Footer**: Sticky or bottom-adhering, `bg-muted/40`
+Glass surfaces layered on gradient backgrounds — no hard shadows. Dark mode: deep plum-to-midnight gradient with glass cards at 20px blur, 5% white background + 12% border. Light mode: warm pearl-to-white gradient with glass cards at 20px blur, 60% white background + 85% border. Navigation floats above content with adaptive blur and opacity on scroll. Cover images parallax at 60-70% of page scroll speed, creating depth illusion.
 
 ## Structural Zones
-| Zone | Treatment |
-|------|-----------|
-| Header/Navigation | Sticky, card-colored background, 1px bottom border, no shadow |
-| Main Content Area | Background color canvas, full-bleed media cards |
-| Card/Media Feed | Bordered containers with 8px radius, consistent gutter spacing |
-| Action Buttons | Muted background; accent color only on interactive states (:hover/:active) |
-| Footer/Bottom Nav | Muted background, higher opacity, border-top for separation |
+| Zone | Background | Border | Treatment |
+|------|-----------|--------|-----------|
+| Header/Nav | `glass-nav-dark` / `glass-nav-light` | Subtle 1px glass | Fixed top, sticky on scroll, blurs content beneath |
+| Floating Bottom Nav | `glass-nav-dark` / `glass-nav-light` | 1px glass | Floats above bottom edge, shrinks on scroll down, expands on scroll up |
+| Main Content | Gradient background, full-bleed | — | Card-based masonry on Explore, full-bleed hero on detail |
+| Glass Cards | `glass-card-dark` / `glass-card-light` | 1px glass | Bordered frosted containers, parallax cover images, tap scale feedback |
+| Action Buttons | Muted on default, primary on hover | Subtle glass border | 48px+ touch target, spring-physics scale on tap |
+| Modals | `glass-modal-dark` / `glass-modal-light` | 1px glass | Centered dark frosted card, backdrop blur overlay, scale-in entrance |
+
+## Spacing & Rhythm
+Generous margins with breathing room — 16px gutters on mobile (sm), 24px on tablet (md), 32px desktop (lg). Card spacing consistent across Explore masonry, Memories feed, Media grid. Touch targets 48px minimum (12px padding on 24px base). Staggered entrance animations for list items (60ms delay per item, max 200ms offset).
 
 ## Component Patterns
-- Cards: Uniform border radius (8px), subtle 1px border
-- Buttons: 48px+ touch target; hover state changes background to primary or accent
-- Input/Textarea: Border focus state with ring in primary color
-- Modals: Card on overlay, centered, no excessive shadow, focus on content
-- Avatar/Profile Pic: 32px–48px, full-circle border-radius
-- Status Indicators: Success (green), destructive (red), neutral (grey)
-- RSVP Badges: Display attending/maybe/not-attending with semantic color (success/warning/muted)
-- **Event Pass Modal**: Centered dark card, QR code focal point, minimal text
-- **Editable Profile**: Card-style form sections (basic info, socials list, payment details), add/remove buttons
-- **Explore Filter Bar**: Compact row with date input, tag chips, "Near Me" button; removable tags
-- **Share Section**: Copy-link button with success feedback, collapsible QR container, prioritized tabs (Memories/Media/People)
+- **Cards**: `glass-card` utility, rounded-lg (8px), 1px glass border, parallax cover images on scroll
+- **Buttons**: 48px+ target, `button-spring` scale on active, accent color only on `:hover`/`:active`, grayscale default
+- **Modals**: `glass-modal` + `modal-overlay`, centered, scale-in entrance (0.92 → 1), blur-backdrop
+- **Memories Feed**: Animated message bubbles sliding in (slide-up), newest at bottom, tap to expand media fullscreen
+- **Event Pass Button**: Shimmer pulse when attending, opens QR modal with scale-spring entrance
+- **Profile Editable**: Inline editing, glass input fields, add/remove buttons for payment details, no intermediate save
+- **Explore Filters**: Compact glass pill filter bar (date range, tag chips, "Near Me" button), removable tags
+- **Share Section**: Copy-link button with success feedback checkmark, collapsible QR (default collapsed), prioritized tabs
 
 ## Motion
-Single, consistent transition: `cubic-bezier(0.4, 0, 0.2, 1)` at 0.3s for all interactive elements. No bounce, no easing delays. Subtle fade-in for modals and overlays.
+All animations respect `prefers-reduced-motion`. Default timing: 0.3s ease-out for interactive, 0.5s spring for spring-physics. No bounce except spring-physics buttons. Choreography: entrance animations stagger, hover states instant, dismissals fade-out. Parallax driven by native scroll.
 
-## Signature Detail
-**"Moments live in time"** — Chronological framing embedded in every interaction. Media feeds display reverse-chronological (newest first). Moment creation emphasizes date/time as primary metadata. Social actions (following, RSVP) preserve the moment's narrative. Timeline-based UX reinforces memory-capture story.
-
-**New Feature Patterns (v2)**:
-- **Event Pass**: QR-only modal confirming attendance; scanning reveals username, RSVP time, event date, status
-- **Profile Editing**: Flexible payment details (PayPal, wallet, Revolut, etc.) as label/value pairs; multiple socials; live edit without intermediate save
-- **Explore Filters**: Compact filter bar with date range, tag chips (removable), "Near Me" button (user-triggered location only)
-- **Share Redesign**: Copy-link button with success feedback replaces full URL display; QR collapses by default; Memories/Media/People tabs prioritized
-
-## Anti-patterns to Avoid
-- ❌ No gradients, no decorative blurs, no ambient orbs
-- ❌ No rainbow color palettes; only grayscale + two accent colors (red, green)
-- ❌ No uniform rounded-lg everywhere; vary radius intentionally
-- ❌ No default Tailwind shadows; depth via elevation zones only
-- ❌ No scattered animations; all motion follows single choreography
+| Interaction | Animation | Timing |
+|---|---|---|
+| Page entrance | fade-in + slide-up | 0.3s ease-out |
+| Tab switch | crossfade or slide | 0.2s ease-out |
+| Button tap | scale-spring (0.95→1.02→1) | 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) |
+| Modal open | scale-in (0.92→1) + fade-in | 0.3s ease-out |
+| Event Pass button | glow-pulse (infinite) | 2s ease-in-out |
+| Message enter | slide-up (staggered) | 0.3s ease-out, 60ms per item |
+| Shimmer loading | shimmer-sweep (background-position) | 2s infinite |
+| Drawer (calendar day view) | drawer-slide (translateY 100%→0) | 0.3s ease-out |
 
 ## Constraints
-- Mobile-first responsive design (breakpoints: sm, md, lg)
-- Dark mode: intentional, not inverted lightness; tune L and C separately
-- Backend-driven color for semantic state (no client guessing)
-- Accessibility: WCAG AA+ contrast verified in both modes
+- Mobile-first responsive (sm, md, lg breakpoints — no xl for EveryMoment)
+- Dark mode intentional: deep purple gradients, bright near-white text, electric indigo accents; not inverted lightness
+- Light mode tuned for clarity: warm pearl gradients, deep charcoal text, sharp indigo accents
+- Glass blur maximum 3–4 layers on screen at once (GPU efficiency)
+- Animations use `transform` and `opacity` only (no layout thrashing)
+- All interactive elements 48px+ touch target on mobile
+- WCAG AA+ contrast verified in both light and dark modes
+- No session timeout; sessions persist until browser storage cleared
+- All accessibility labels and ARIA for screen readers
+
+## Signature Detail
+**"Moments live in time"** — parallax scroll depth reinforces chronological narrative. Cover images drift slower than page (60–70% scroll speed), creating illusion of layered depth as you scroll through memories. Floating navigation shrinks on scroll down (gets out of way) and expands on scroll up (ready for navigation). This interplay between content and UI makes scrolling feel purposeful, not just utility.
+
+## Anti-patterns to Avoid
+❌ No hard shadows or solid overlays — only glass and blur | ❌ No rainbow palettes — 3 colors max + accent only | ❌ No uniform rounded-lg — vary radius intentionally (4px, 8px, 12px) | ❌ No scattered animations — all follow single choreography | ❌ No session timeouts — sessions persist indefinitely | ❌ No motion by default for prefers-reduced-motion users | ❌ No decorative gradients on text — text must be high contrast
+
+## Verified Tokens
+- Glass morphism: `glass-card`, `glass-nav`, `glass-modal`, `glass-input` (dark + light variants)
+- Animations: `slide-up`, `scale-in`, `scale-spring`, `glow-pulse`, `shimmer`, `drawer-slide`, `blur-in`
+- Typography: `text-display-xl/lg/md/sm`, `text-meta`, `text-body`
+- Interactive: `button-spring` (scale 95% on active), `tap-target` (48px min), `transition-smooth` (0.3s)
+- Depth: `glow-accent`, `glow-accent-sm` (accent halo)
+- Gradients: `bg-gradient-page` (theme-aware light/dark)

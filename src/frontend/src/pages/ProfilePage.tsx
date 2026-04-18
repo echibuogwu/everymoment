@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +19,8 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { motion, useScroll, useTransform } from "motion/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalBlob } from "../backend";
 import { AuthGuard } from "../components/AuthGuard";
 import { EmptyState } from "../components/EmptyState";
@@ -77,32 +77,27 @@ function initEditState(user: UserProfilePublic): EditState {
   };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Socials View ──────────────────────────────────────────────────────────────
 
 function SocialLinksView({ socials }: { socials: SocialLink[] }) {
   if (!socials.length) return null;
   return (
-    <div className="form-section space-y-2">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+    <div className="space-y-3">
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         Socials
       </h3>
-      <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
         {socials.map((s, i) => (
           <a
             key={`${s.name}-${i}`}
             href={s.url.startsWith("http") ? s.url : `https://${s.url}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="list-item hover:border-primary/40 transition-smooth group"
+            className="glass-card flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth group"
             data-ocid={`profile.social.item.${i + 1}`}
           >
-            <span className="text-sm font-medium text-foreground">
-              {s.name}
-            </span>
-            <div className="flex items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-smooth">
-              <span className="text-xs truncate max-w-[140px]">{s.url}</span>
-              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-            </div>
+            <span>{s.name}</span>
+            <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-accent transition-smooth" />
           </a>
         ))}
       </div>
@@ -110,24 +105,26 @@ function SocialLinksView({ socials }: { socials: SocialLink[] }) {
   );
 }
 
+// ── Payment Details View ──────────────────────────────────────────────────────
+
 function PaymentDetailsView({ details }: { details: PaymentDetail[] }) {
   if (!details.length) return null;
   return (
-    <div className="form-section space-y-2">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+    <div className="space-y-3">
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         Payment Details
       </h3>
       <div className="space-y-2">
         {details.map((d, i) => (
           <div
             key={`${d.name}-${i}`}
-            className="list-item"
+            className="glass-card flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl"
             data-ocid={`profile.payment.item.${i + 1}`}
           >
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-sm font-semibold text-foreground">
               {d.name}
             </span>
-            <span className="text-xs text-muted-foreground font-mono truncate max-w-[160px]">
+            <span className="text-xs text-muted-foreground font-mono truncate max-w-[180px]">
               {d.value}
             </span>
           </div>
@@ -240,30 +237,34 @@ function EditForm({
     !usernameError && !checkingUsername && state.username.trim().length >= 3;
 
   return (
-    <div className="space-y-4" data-ocid="profile.edit_form">
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.34, 1.3, 0.64, 1] }}
+      className="space-y-4 animate-slide-down"
+      data-ocid="profile.edit_form"
+    >
       {/* Photo */}
-      <div className="form-section">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <div className="glass-card rounded-2xl p-4 space-y-3">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Profile Photo
         </h3>
         <div className="flex items-center gap-4">
-          <div className="relative">
-            <Avatar className="w-16 h-16">
-              {state.photoPreview ? (
-                <AvatarImage src={state.photoPreview} alt="Preview" />
-              ) : null}
-              <AvatarFallback className="font-display font-bold text-xl bg-secondary text-secondary-foreground">
-                {state.username.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </div>
+          <Avatar className="w-16 h-16 ring-2 ring-white/30 shadow-lg glow-accent-sm">
+            {state.photoPreview ? (
+              <AvatarImage src={state.photoPreview} alt="Preview" />
+            ) : null}
+            <AvatarFallback className="font-display font-bold text-xl bg-secondary text-secondary-foreground">
+              {state.username.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           <div>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => photoInputRef.current?.click()}
-              className="tap-target"
+              className="glass-card border-white/20 tap-target"
               data-ocid="profile.photo_upload_button"
             >
               Change photo
@@ -284,12 +285,15 @@ function EditForm({
       </div>
 
       {/* Basic Info */}
-      <div className="form-section space-y-3">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <div className="glass-card rounded-2xl p-4 space-y-3">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Basic Info
         </h3>
         <div className="space-y-1.5">
-          <Label htmlFor="edit-name" className="text-sm font-medium">
+          <Label
+            htmlFor="edit-name"
+            className="text-sm font-medium text-foreground"
+          >
             Display Name
           </Label>
           <Input
@@ -297,12 +301,15 @@ function EditForm({
             value={state.name}
             onChange={(e) => set({ name: e.target.value })}
             placeholder="Your name"
-            className="bg-background"
+            className="glass-input rounded-xl border-white/20 bg-transparent"
             data-ocid="profile.name_input"
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="edit-username" className="text-sm font-medium">
+          <Label
+            htmlFor="edit-username"
+            className="text-sm font-medium text-foreground"
+          >
             Username
           </Label>
           <Input
@@ -311,7 +318,7 @@ function EditForm({
             onChange={(e) => set({ username: e.target.value })}
             onBlur={handleUsernameBlur}
             placeholder="username"
-            className="bg-background"
+            className="glass-input rounded-xl border-white/20 bg-transparent"
             data-ocid="profile.username_input"
           />
           {usernameError && (
@@ -327,7 +334,10 @@ function EditForm({
           )}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="edit-location" className="text-sm font-medium">
+          <Label
+            htmlFor="edit-location"
+            className="text-sm font-medium text-foreground"
+          >
             Location
           </Label>
           <Input
@@ -335,14 +345,14 @@ function EditForm({
             value={state.location}
             onChange={(e) => set({ location: e.target.value })}
             placeholder="City, Country"
-            className="bg-background"
+            className="glass-input rounded-xl border-white/20 bg-transparent"
             data-ocid="profile.location_input"
           />
         </div>
       </div>
 
       {/* Socials */}
-      <div className="form-section space-y-3">
+      <div className="glass-card rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Socials
@@ -351,7 +361,7 @@ function EditForm({
             <button
               type="button"
               onClick={addSocial}
-              className="add-button flex items-center gap-1"
+              className="flex items-center gap-1 px-3 py-1.5 glass-card rounded-full text-xs font-medium text-accent hover:ring-1 hover:ring-accent/40 transition-smooth"
               data-ocid="profile.add_social_button"
             >
               <Plus className="w-3.5 h-3.5" /> Add
@@ -373,15 +383,15 @@ function EditForm({
                 <Input
                   value={s.name}
                   onChange={(e) => updateSocial(i, "name", e.target.value)}
-                  placeholder="Platform (e.g. Twitter)"
-                  className="bg-background flex-1 min-w-0"
+                  placeholder="Platform"
+                  className="glass-input rounded-xl border-white/20 bg-transparent flex-1 min-w-0"
                   data-ocid={`profile.social_name.${i + 1}`}
                 />
                 <Input
                   value={s.url}
                   onChange={(e) => updateSocial(i, "url", e.target.value)}
                   placeholder="URL"
-                  className="bg-background flex-1 min-w-0"
+                  className="glass-input rounded-xl border-white/20 bg-transparent flex-1 min-w-0"
                   data-ocid={`profile.social_url.${i + 1}`}
                 />
                 <button
@@ -400,7 +410,7 @@ function EditForm({
       </div>
 
       {/* Payment Details */}
-      <div className="form-section space-y-3">
+      <div className="glass-card rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Payment Details
@@ -409,7 +419,7 @@ function EditForm({
             <button
               type="button"
               onClick={addPayment}
-              className="add-button flex items-center gap-1"
+              className="flex items-center gap-1 px-3 py-1.5 glass-card rounded-full text-xs font-medium text-accent hover:ring-1 hover:ring-accent/40 transition-smooth"
               data-ocid="profile.add_payment_button"
             >
               <Plus className="w-3.5 h-3.5" /> Add
@@ -435,14 +445,14 @@ function EditForm({
                   value={d.name}
                   onChange={(e) => updatePayment(i, "name", e.target.value)}
                   placeholder="Type (e.g. Bitcoin)"
-                  className="bg-background flex-[0.6] min-w-0"
+                  className="glass-input rounded-xl border-white/20 bg-transparent flex-[0.6] min-w-0"
                   data-ocid={`profile.payment_name.${i + 1}`}
                 />
                 <Input
                   value={d.value}
                   onChange={(e) => updatePayment(i, "value", e.target.value)}
                   placeholder="Address / link / tag"
-                  className="bg-background flex-1 min-w-0"
+                  className="glass-input rounded-xl border-white/20 bg-transparent flex-1 min-w-0"
                   data-ocid={`profile.payment_value.${i + 1}`}
                 />
                 <button
@@ -462,32 +472,91 @@ function EditForm({
 
       {/* Save / Cancel */}
       <div className="flex gap-3 pt-2">
-        <Button
-          type="button"
-          onClick={onSave}
-          disabled={!canSave || isSaving}
-          className="flex-1 tap-target"
-          data-ocid="profile.save_button"
+        <motion.div
+          className="flex-1"
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
         >
-          {isSaving ? (
-            "Saving…"
-          ) : (
-            <>
-              <Check className="w-4 h-4 mr-1.5" /> Save changes
-            </>
-          )}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSaving}
-          className="tap-target"
-          data-ocid="profile.cancel_button"
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={!canSave || isSaving}
+            className="w-full tap-target rounded-2xl bg-accent text-accent-foreground hover:opacity-90"
+            data-ocid="profile.save_button"
+          >
+            {isSaving ? (
+              "Saving…"
+            ) : (
+              <>
+                <Check className="w-4 h-4 mr-1.5" /> Save changes
+              </>
+            )}
+          </Button>
+        </motion.div>
+        <motion.div
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
         >
-          <X className="w-4 h-4 mr-1" /> Cancel
-        </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSaving}
+            className="tap-target glass-card border-white/20 rounded-2xl"
+            data-ocid="profile.cancel_button"
+          >
+            <X className="w-4 h-4 mr-1" /> Cancel
+          </Button>
+        </motion.div>
       </div>
+    </motion.div>
+  );
+}
+
+// ── Profile Loading Skeleton ──────────────────────────────────────────────────
+
+function ProfileSkeleton() {
+  return (
+    <div>
+      {/* Banner skeleton */}
+      <div className="h-48 w-full animate-shimmer rounded-none" />
+      <div className="px-4 pb-6">
+        {/* Avatar */}
+        <div className="flex justify-center -mt-12 mb-4">
+          <Skeleton className="w-24 h-24 rounded-full ring-4 ring-background" />
+        </div>
+        {/* Name + username */}
+        <div className="flex flex-col items-center gap-2 mb-4">
+          <Skeleton className="w-40 h-6 rounded-lg" />
+          <Skeleton className="w-28 h-4 rounded-lg" />
+        </div>
+        {/* Stats row */}
+        <Skeleton className="w-full h-16 rounded-2xl mb-6" />
+        {/* Content */}
+        <div className="space-y-3">
+          <Skeleton className="w-full h-10 rounded-xl" />
+          <Skeleton className="w-full h-10 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Stats Pill ────────────────────────────────────────────────────────────────
+
+function StatItem({
+  value,
+  label,
+}: {
+  value: string | number;
+  label: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
+      <span className="text-gradient-accent font-display font-bold text-lg leading-tight">
+        {value}
+      </span>
+      <span className="text-xs text-muted-foreground font-body">{label}</span>
     </div>
   );
 }
@@ -504,6 +573,11 @@ export function ProfilePage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editState, setEditState] = useState<EditState | null>(null);
+
+  // Parallax for hero banner
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  const bannerY = useTransform(scrollY, [0, 300], [0, 90]);
 
   const profileQuery = useQuery<UserProfilePublic | null>({
     queryKey: QUERY_KEYS.userProfileByUsername(username),
@@ -614,10 +688,14 @@ export function ProfilePage() {
     setEditState(null);
   };
 
+  const avatarSrc = user?.photo ? user.photo.getDirectURL() : undefined;
+  const avatarFallback = (user?.username ?? "??").slice(0, 2).toUpperCase();
+
   return (
     <AuthGuard requireAuth={false} currentPath={`/profile/${username}`}>
       <Layout>
-        <div className="py-4 space-y-6">
+        {/* Back button — overlaid at top */}
+        <div className="px-4 pt-4 pb-0">
           <button
             type="button"
             onClick={() => navigate({ to: "/explore" })}
@@ -627,123 +705,213 @@ export function ProfilePage() {
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm font-body">Back</span>
           </button>
+        </div>
 
-          {profileQuery.isLoading ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Skeleton className="w-16 h-16 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="w-32 h-5 rounded" />
-                  <Skeleton className="w-24 h-4 rounded" />
-                </div>
-              </div>
-              <Skeleton className="w-full h-24 rounded-lg" />
-            </div>
-          ) : !user ? (
+        {profileQuery.isLoading ? (
+          <ProfileSkeleton />
+        ) : !user ? (
+          <div className="px-4 py-8">
             <EmptyState
               title="User not found"
               description="This profile doesn't exist."
             />
-          ) : (
-            <>
-              {/* Profile header */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-16 h-16">
-                    {user.photo && (
-                      <AvatarImage
-                        src={user.photo.getDirectURL()}
-                        alt={user.username}
-                      />
+          </div>
+        ) : (
+          <>
+            {/* ── Hero Banner ── */}
+            <div
+              ref={heroRef}
+              className="relative h-48 md:h-64 w-full overflow-hidden"
+            >
+              <motion.div
+                style={{ y: bannerY }}
+                className="absolute inset-0 w-full h-[130%] -top-[15%]"
+              >
+                {/* Gradient banner with subtle pattern */}
+                <div
+                  className="w-full h-full"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.18 0.08 300) 0%, oklch(0.10 0.05 260) 40%, oklch(0.14 0.06 280) 100%)",
+                  }}
+                >
+                  {/* Decorative circles for depth */}
+                  <div
+                    className="absolute -top-8 -right-8 w-48 h-48 rounded-full opacity-20"
+                    style={{
+                      background:
+                        "radial-gradient(circle, oklch(0.72 0.28 280), transparent 70%)",
+                    }}
+                  />
+                  <div
+                    className="absolute bottom-0 left-8 w-32 h-32 rounded-full opacity-15"
+                    style={{
+                      background:
+                        "radial-gradient(circle, oklch(0.72 0.18 300), transparent 70%)",
+                    }}
+                  />
+                  <div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full opacity-10"
+                    style={{
+                      background:
+                        "radial-gradient(circle, oklch(0.82 0.25 260), transparent 70%)",
+                    }}
+                  />
+                </div>
+              </motion.div>
+
+              {/* Gradient fade to background at bottom */}
+              <div
+                className="absolute inset-x-0 bottom-0 h-24"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, transparent, oklch(var(--background)))",
+                }}
+              />
+            </div>
+
+            {/* ── Avatar + Identity ── */}
+            <div className="px-4 -mt-12 flex flex-col items-center">
+              <motion.div
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
+                className="relative"
+              >
+                <div className="w-24 h-24 rounded-full ring-2 ring-white/30 shadow-xl glow-accent-sm overflow-hidden">
+                  <Avatar className="w-full h-full">
+                    {avatarSrc && (
+                      <AvatarImage src={avatarSrc} alt={user.username} />
                     )}
-                    <AvatarFallback className="font-display font-bold text-xl bg-secondary text-secondary-foreground">
-                      {user.username.slice(0, 2).toUpperCase()}
+                    <AvatarFallback className="font-display font-bold text-2xl bg-secondary text-secondary-foreground w-full h-full flex items-center justify-center">
+                      {avatarFallback}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="min-w-0">
-                    {user.name && (
-                      <p className="font-display font-bold text-xl text-foreground truncate">
-                        {user.name}
-                      </p>
-                    )}
-                    <p
-                      className={`font-body text-muted-foreground truncate ${user.name ? "text-sm" : "font-display font-bold text-xl text-foreground"}`}
-                    >
-                      @{user.username}
-                    </p>
-                    {user.location && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <MapPin className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs text-muted-foreground truncate">
-                          {user.location}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex gap-4 mt-1.5">
-                      <span className="text-sm text-muted-foreground font-body">
-                        <span className="font-semibold text-foreground">
-                          {user.followersCount.toString()}
-                        </span>{" "}
-                        followers
-                      </span>
-                      <span className="text-sm text-muted-foreground font-body">
-                        <span className="font-semibold text-foreground">
-                          {user.followingCount.toString()}
-                        </span>{" "}
-                        following
-                      </span>
-                    </div>
-                  </div>
                 </div>
+              </motion.div>
 
+              {/* Name + username */}
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12, duration: 0.35 }}
+                className="text-center mt-3 space-y-0.5"
+              >
+                {user.name && (
+                  <h1 className="text-gradient-accent font-display font-bold text-2xl leading-tight">
+                    {user.name}
+                  </h1>
+                )}
+                <p
+                  className={`font-body text-muted-foreground ${!user.name ? "font-display font-bold text-2xl text-gradient-accent" : "text-sm"}`}
+                >
+                  @{user.username}
+                </p>
+                {user.location && (
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    <span className="text-xs text-muted-foreground">
+                      {user.location}
+                    </span>
+                  </div>
+                )}
+              </motion.div>
+
+              {/* ── Stats Row ── */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.35 }}
+                className="w-full mt-4"
+              >
+                <div className="glass-card rounded-2xl px-4 py-3 flex items-center">
+                  <StatItem
+                    value={momentsQuery.data?.length ?? 0}
+                    label="Moments"
+                  />
+                  <div className="w-px h-8 bg-border/50 self-center" />
+                  <StatItem
+                    value={user.followersCount.toString()}
+                    label="Followers"
+                  />
+                  <div className="w-px h-8 bg-border/50 self-center" />
+                  <StatItem
+                    value={user.followingCount.toString()}
+                    label="Following"
+                  />
+                </div>
+              </motion.div>
+
+              {/* ── Action buttons ── */}
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.28, duration: 0.3 }}
+                className="mt-4 w-full flex justify-center"
+              >
                 {isOwnProfile ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleEditStart}
-                    className="tap-target flex-shrink-0 gap-1.5"
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    onClick={isEditing ? handleCancel : handleEditStart}
+                    className="glass-card flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
                     data-ocid="profile.edit_button"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Edit
-                  </Button>
+                    <motion.div
+                      animate={{ rotate: isEditing ? 45 : 0 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </motion.div>
+                    {isEditing ? "Cancel" : "Edit Profile"}
+                  </motion.button>
                 ) : isAuthenticated ? (
-                  <Button
-                    size="sm"
-                    variant={isFollowingQuery.data ? "outline" : "default"}
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     onClick={() => followMutation.mutate()}
                     disabled={
                       followMutation.isPending || isFollowingQuery.isLoading
                     }
-                    className="tap-target flex-shrink-0"
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-semibold transition-smooth ${
+                      isFollowingQuery.data
+                        ? "glass-card text-foreground hover:ring-1 hover:ring-border"
+                        : "bg-accent text-accent-foreground hover:opacity-90"
+                    }`}
                     data-ocid="profile.follow_button"
                   >
                     {isFollowingQuery.data ? (
                       <>
-                        <UserMinus className="w-4 h-4 mr-1" /> Unfollow
+                        <UserMinus className="w-4 h-4" /> Following
                       </>
                     ) : (
                       <>
-                        <UserPlus className="w-4 h-4 mr-1" /> Follow
+                        <UserPlus className="w-4 h-4" /> Follow
                       </>
                     )}
-                  </Button>
+                  </motion.button>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     onClick={() => requireAuth(() => {})}
                     disabled={isLoggingIn}
-                    className="tap-target flex-shrink-0 gap-1.5"
+                    className="glass-card flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
                     data-ocid="profile.signin_button"
                   >
                     <LogIn className="w-3.5 h-3.5" />
                     {isLoggingIn ? "Signing in…" : "Sign in to follow"}
-                  </Button>
+                  </motion.button>
                 )}
-              </div>
+              </motion.div>
+            </div>
 
-              {/* Edit form (own profile) */}
+            {/* ── Content below hero ── */}
+            <div className="px-4 mt-6 pb-8 space-y-6">
+              {/* Edit form */}
               {isEditing && editState ? (
                 <EditForm
                   state={editState}
@@ -755,55 +923,90 @@ export function ProfilePage() {
                 />
               ) : (
                 <>
-                  {/* Read-only socials + payment details */}
+                  {/* Socials chips */}
                   {user.socials && user.socials.length > 0 && (
-                    <SocialLinksView socials={user.socials} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.32, duration: 0.3 }}
+                    >
+                      <SocialLinksView socials={user.socials} />
+                    </motion.div>
                   )}
+
+                  {/* Payment details */}
                   {user.paymentDetails && user.paymentDetails.length > 0 && (
-                    <PaymentDetailsView details={user.paymentDetails} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.38, duration: 0.3 }}
+                    >
+                      <PaymentDetailsView details={user.paymentDetails} />
+                    </motion.div>
                   )}
                 </>
               )}
 
               {/* Moments grid */}
               {!isEditing && (
-                <div>
-                  <h2 className="font-display font-semibold text-lg text-foreground mb-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.44, duration: 0.35 }}
+                >
+                  <h2 className="text-gradient-accent font-display font-bold text-xl mb-4">
                     Moments
                   </h2>
                   {momentsQuery.isLoading ? (
                     <div className="space-y-4">
                       {[1, 2].map((i) => (
-                        <Skeleton key={i} className="w-full h-52 rounded-lg" />
+                        <Skeleton key={i} className="w-full h-52 rounded-2xl" />
                       ))}
                     </div>
                   ) : momentsQuery.data?.length === 0 ? (
-                    <EmptyState
-                      icon={Calendar}
-                      title="No moments yet"
-                      description="This user hasn't created any moments."
-                    />
+                    <div
+                      className="glass-card rounded-2xl p-8 flex flex-col items-center"
+                      data-ocid="profile.moments_empty_state"
+                    >
+                      <EmptyState
+                        icon={Calendar}
+                        title="No moments yet"
+                        description="This user hasn't created any moments."
+                      />
+                    </div>
                   ) : (
                     <div className="space-y-4">
-                      {momentsQuery.data?.map((moment) => (
-                        <MomentCard
+                      {momentsQuery.data?.map((moment, index) => (
+                        <motion.div
                           key={moment.id.toString()}
-                          moment={moment}
-                          onClick={() =>
-                            navigate({
-                              to: "/moments/$momentId",
-                              params: { momentId: moment.id.toString() },
-                            })
-                          }
-                        />
+                          initial={{ opacity: 0, y: 16 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{
+                            delay: index * 0.08,
+                            duration: 0.35,
+                            ease: [0.34, 1.2, 0.64, 1],
+                          }}
+                          data-ocid={`profile.moment.item.${index + 1}`}
+                        >
+                          <MomentCard
+                            moment={moment}
+                            onClick={() =>
+                              navigate({
+                                to: "/moments/$momentId",
+                                params: { momentId: moment.id.toString() },
+                              })
+                            }
+                          />
+                        </motion.div>
                       ))}
                     </div>
                   )}
-                </div>
+                </motion.div>
               )}
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </Layout>
     </AuthGuard>
   );

@@ -1,5 +1,5 @@
-import { Input } from "@/components/ui/input";
 import { MapPin, Search } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface NominatimResult {
@@ -142,8 +142,9 @@ export function LocationInput({
   return (
     <div ref={containerRef} className="relative" data-ocid={dataOcid}>
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <Input
+        {/* Map pin icon */}
+        <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-accent pointer-events-none z-10" />
+        <input
           id={id}
           value={query}
           onChange={handleInputChange}
@@ -152,43 +153,78 @@ export function LocationInput({
             if (suggestions.length > 0) setIsOpen(true);
           }}
           placeholder={placeholder}
-          className="font-body tap-target pl-9 pr-8"
+          className="
+            w-full h-12 pl-10 pr-10 rounded-xl font-body text-sm
+            glass-input
+            text-foreground placeholder:text-muted-foreground
+            focus:outline-none focus:ring-2 focus:ring-accent/40
+            transition-all duration-200
+          "
           autoComplete="off"
         />
         {isLoading && (
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-pulse pointer-events-none" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-pulse pointer-events-none" />
         )}
       </div>
 
-      {isOpen && (suggestions.length > 0 || noResults) && (
-        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
-          {noResults ? (
-            <div className="px-3 py-3 text-sm text-muted-foreground font-body text-center">
-              No results — try a different search
-            </div>
-          ) : (
-            <div>
-              {suggestions.map((result) => (
-                <button
-                  key={result.place_id}
-                  type="button"
-                  className="w-full flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors border-b border-border/50 last:border-b-0 text-left"
-                  onMouseDown={(e) => {
-                    // mousedown prevents input blur before click fires
-                    e.preventDefault();
-                    handleSelect(result);
-                  }}
-                >
-                  <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                  <span className="text-sm font-body text-foreground leading-snug min-w-0">
-                    {truncate(result.display_name)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {isOpen && (suggestions.length > 0 || noResults) && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute top-full left-0 right-0 mt-2 z-[200] glass-modal rounded-2xl overflow-hidden"
+          >
+            {noResults ? (
+              <div className="px-4 py-4 text-sm text-muted-foreground font-body text-center">
+                No locations found — try a different search
+              </div>
+            ) : (
+              <div className="py-1">
+                {suggestions.map((result, index) => (
+                  <motion.button
+                    key={result.place_id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.04, duration: 0.15 }}
+                    type="button"
+                    className="
+                      w-full flex items-start gap-3 px-4 py-3 cursor-pointer text-left
+                      hover:bg-accent/10 transition-colors duration-150
+                      border-b border-white/10 last:border-b-0
+                    "
+                    onMouseDown={(e) => {
+                      // mousedown prevents input blur before click fires
+                      e.preventDefault();
+                      handleSelect(result);
+                    }}
+                  >
+                    <div className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center">
+                      <MapPin className="w-3 h-3 text-accent" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-body font-medium text-foreground leading-snug truncate">
+                        {result.display_name.split(",")[0]}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-body leading-snug mt-0.5 truncate">
+                        {truncate(
+                          result.display_name
+                            .split(",")
+                            .slice(1)
+                            .join(",")
+                            .trim(),
+                          55,
+                        )}
+                      </p>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

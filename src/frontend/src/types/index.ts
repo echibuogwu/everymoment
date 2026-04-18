@@ -24,6 +24,8 @@ export type {
   MediaId,
   CommentId,
   Timestamp,
+  RecurrenceRule,
+  RecurrenceEndCondition,
 } from "../backend";
 
 export {
@@ -32,4 +34,5 @@ export {
   RsvpStatus,
   UserRole,
   Visibility,
+  RecurrenceFrequency,
 } from "../backend";

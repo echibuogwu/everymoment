@@ -105,8 +105,9 @@ const MOCK_NEW_ID = "d4e5f6a7-b8c9-0123-defa-123456789003";
 
 export const mockBackend: backendInterface = {
   addComment: async () => BigInt(1),
+  adminDeleteAllMoments: async () => undefined,
   adminDeleteMedia: async () => undefined,
-  adminBulkImportMoments: async () => ({ successCount: BigInt(0), errors: [] }),
+  adminBulkImportMoments: async () => ({ successCount: BigInt(0), errors: [], warnings: [] }),
   adminDeleteMoment: async () => undefined,
   adminDeleteUser: async () => undefined,
   adminListMedia: async () => sampleMedia,
@@ -157,6 +158,10 @@ export const mockBackend: backendInterface = {
     ],
   }),
   getCallerUserRole: async () => UserRole.user,
+  getEventPassInfo: async (_momentId, _userId) => ({
+    __kind__: "err" as const,
+    err: "not found",
+  }),
   getFeedMoments: async () => sampleMoments,
   getFollowers: async () => [],
   getFollowing: async () => [],

@@ -37,7 +37,7 @@ function FolderRow({ folder, isOwner, onDelete }: FolderRowProps) {
           </p>
           {folder.isDefault && (
             <p className="text-xs text-muted-foreground font-body">
-              Default folder
+              All attendees can upload here
             </p>
           )}
         </div>
@@ -234,7 +234,7 @@ export function FolderManager({ momentId, isOwner }: FolderManagerProps) {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete Folder"
-        description={`Delete "${deleteTarget?.name}"? All media in this folder will be moved to the default folder.`}
+        description={`Delete "${deleteTarget?.name}"? All media in this folder will be moved to the public folder.`}
         confirmLabel="Delete"
         destructive
         onConfirm={() => {

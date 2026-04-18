@@ -1,10 +1,7 @@
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -32,29 +29,52 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-sm mx-4">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="font-display">{title}</AlertDialogTitle>
-          {description && (
-            <AlertDialogDescription>{description}</AlertDialogDescription>
-          )}
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel data-ocid="confirm-dialog-cancel">
-            {cancelLabel}
-          </AlertDialogCancel>
-          <AlertDialogAction
-            data-ocid="confirm-dialog-confirm"
-            onClick={onConfirm}
-            className={
-              destructive
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                : ""
-            }
-          >
-            {confirmLabel}
-          </AlertDialogAction>
-        </AlertDialogFooter>
+      <AlertDialogContent
+        className="glass-modal border-0 rounded-3xl p-0 max-w-sm mx-4 overflow-hidden shadow-2xl animate-scale-in"
+        style={{ padding: 0 }}
+      >
+        <div className="p-6 space-y-5">
+          <AlertDialogHeader className="space-y-2">
+            <AlertDialogTitle className="font-display text-xl font-bold text-foreground">
+              {title}
+            </AlertDialogTitle>
+            {description && (
+              <AlertDialogDescription className="font-body text-muted-foreground leading-relaxed">
+                {description}
+              </AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+
+          <div className="flex gap-3 pt-1">
+            {/* Cancel */}
+            <button
+              type="button"
+              data-ocid="confirm-dialog-cancel"
+              onClick={() => onOpenChange(false)}
+              className="flex-1 glass-card rounded-2xl px-4 py-3 text-sm font-body font-medium text-foreground button-spring transition-smooth hover:opacity-80 active:scale-95"
+            >
+              {cancelLabel}
+            </button>
+
+            {/* Confirm */}
+            <button
+              type="button"
+              data-ocid="confirm-dialog-confirm"
+              onClick={() => {
+                onConfirm();
+                onOpenChange(false);
+              }}
+              className={[
+                "flex-1 rounded-2xl px-4 py-3 text-sm font-body font-semibold button-spring transition-smooth active:scale-95",
+                destructive
+                  ? "bg-destructive text-destructive-foreground hover:opacity-90"
+                  : "bg-accent text-accent-foreground glow-accent-sm hover:opacity-90",
+              ].join(" ")}
+            >
+              {confirmLabel}
+            </button>
+          </div>
+        </div>
       </AlertDialogContent>
     </AlertDialog>
   );
