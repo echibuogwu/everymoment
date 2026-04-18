@@ -28,6 +28,9 @@ module {
     socials : ?[SocialLink];
     paymentDetails : ?[PaymentDetail];
     createdAt : Common.Timestamp;
+    // Privacy settings
+    isPrivateProfile : Bool;
+    hideAttendingList : Bool;
   };
 
   // Shared (API boundary) version — no mutable fields
@@ -42,6 +45,10 @@ module {
     followersCount : Nat;
     followingCount : Nat;
     createdAt : Common.Timestamp;
+    isPrivateProfile : Bool;
+    hideAttendingList : Bool;
+    hostedCount : Nat;
+    attendedCount : Nat;
   };
 
   public type SaveProfileInput = {
@@ -51,5 +58,7 @@ module {
     location : ?Text;
     socials : ?[SocialLink];
     paymentDetails : ?[PaymentDetail];
+    isPrivateProfile : Bool;
+    hideAttendingList : Bool;
   };
 };

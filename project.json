@@ -1,28 +1,32 @@
 {
-  "overview": "EveryMoment is a mobile-first web app for capturing, organizing, and sharing event-centric memories. Users create Moments (weddings, parties, milestones) where media, people, and interactions come together in one beautiful, immersive place. Features a Liquid Glass UI with cinematic animations, masonry explore grid, and seamless social features.",
+  "overview": "EveryMoment is a mobile-first, web-based platform for capturing, organizing, and sharing event-centric memories. Users create Moments (weddings, parties, milestones) where media, people, and interactions are organized in one place with robust access control, social features, direct messaging, notifications, and a modern minimal UI.",
   "features": [
-    "Liquid Glass UI with glass morphism cards and parallax scroll",
-    "Pinterest-style masonry Explore page with infinite scroll",
-    "Cinematic moment detail with full-bleed hero and animated tabs",
-    "Conversation-style Memories feed with full media support",
-    "Calendar view with glass pill toggles and day drawer",
-    "Internet Identity passwordless authentication",
-    "Event Pass QR code for attending users",
-    "Advanced Explore filters with Near Me location detection",
-    "Recurring moments with rule-based recurrence",
-    "Admin dashboard with CSV bulk import",
-    "Editable profile with dynamic payment details",
-    "Light/dark mode with animated glass theme toggle"
+    "Create and manage events (Moments) with media, attendees, and conversations",
+    "Event capacity limits with automatic waitlist promotion",
+    "Agenda/schedule timeline for each moment",
+    "Owner announcements broadcast to all RSVPs",
+    "Export moments to Google Calendar, Apple Calendar, or .ics",
+    "1:1 direct messaging between users",
+    "In-app notifications for follows, RSVPs, mentions, and messages",
+    "@mention support in Memories posts",
+    "Activity feed showing followed users' actions",
+    "Bookmark/save moments for later",
+    "Privacy settings: private profile and hide attending list",
+    "Profile stats: hosted count, attended count, followers, following",
+    "QR code event passes for attendees",
+    "Recurring moments with calendar expansion",
+    "Internet Identity passwordless authentication"
   ],
-  "category": "social",
+  "category": "social-events",
   "tags": [
     "events",
-    "memories",
     "social",
-    "mobile-first",
-    "glass-ui",
+    "moments",
+    "memories",
     "calendar",
-    "media-sharing"
+    "messaging",
+    "mobile-first",
+    "internet-identity"
   ],
-  "last_updated": "2026-04-15T11:20:42.274Z"
+  "last_updated": "2026-04-18T15:29:47.985Z"
 }

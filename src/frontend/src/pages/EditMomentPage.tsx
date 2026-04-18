@@ -2,20 +2,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
+  AlarmClock,
   ArrowLeft,
   ArrowRight,
   Calendar,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Globe,
   ImagePlus,
   Info,
   Lock,
   MapPin,
+  Plus,
   RefreshCw,
   Sparkles,
   Tag,
   Trash2,
   Upload,
+  Users,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -29,7 +34,7 @@ import { isPrivateVisibility } from "../components/MomentCard";
 import { useBackend } from "../hooks/use-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { showError, showSuccess } from "../lib/toast";
-import type { MomentDetail, RecurrenceRule } from "../types";
+import type { AgendaItem, MomentDetail, RecurrenceRule } from "../types";
 import { Visibility } from "../types";
 
 function normalizeVisibility(v: unknown): Visibility {
@@ -68,6 +73,22 @@ const FREQUENCY_OPTIONS = [
 ];
 
 type EndConditionType = "never" | "count" | "endDate";
+
+interface AgendaItemDraft {
+  key: number;
+  time: string;
+  title: string;
+  description: string;
+}
+
+function agendaFromBackend(items: AgendaItem[]): AgendaItemDraft[] {
+  return items.map((item, i) => ({
+    key: i + 1,
+    time: item.time,
+    title: item.title,
+    description: item.description ?? "",
+  }));
+}
 
 function buildRecurrenceRule(
   frequency: RecurrenceFrequency,
@@ -128,6 +149,142 @@ function EditFormSkeleton() {
   );
 }
 
+// ── Agenda Editor ──────────────────────────────────────────────────────────────
+
+interface AgendaEditorProps {
+  items: AgendaItemDraft[];
+  onChange: (items: AgendaItemDraft[]) => void;
+  nextKey: number;
+  setNextKey: React.Dispatch<React.SetStateAction<number>>;
+}
+
+function AgendaEditor({
+  items,
+  onChange,
+  nextKey,
+  setNextKey,
+}: AgendaEditorProps) {
+  const addItem = () => {
+    onChange([
+      ...items,
+      { key: nextKey, time: "", title: "", description: "" },
+    ]);
+    setNextKey((k) => k + 1);
+  };
+
+  const removeItem = (key: number) => {
+    onChange(items.filter((i) => i.key !== key));
+  };
+
+  const updateItem = (
+    key: number,
+    field: keyof Omit<AgendaItemDraft, "key">,
+    value: string,
+  ) => {
+    onChange(items.map((i) => (i.key === key ? { ...i, [field]: value } : i)));
+  };
+
+  const [expandedKeys, setExpandedKeys] = useState<Set<number>>(new Set());
+  const toggleExpand = (key: number) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, i) => (
+        <div
+          key={item.key}
+          className="glass-card rounded-xl border border-border overflow-hidden"
+          data-ocid={`agenda-item-row.${i + 1}`}
+        >
+          <div className="flex items-center gap-2 p-3">
+            <AlarmClock className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+            <input
+              value={item.time}
+              onChange={(e) => updateItem(item.key, "time", e.target.value)}
+              placeholder="7:00 PM"
+              className="w-20 h-8 px-2 rounded-lg font-body text-xs glass-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent/40"
+              aria-label="Time"
+              data-ocid={`agenda-time-input.${i + 1}`}
+            />
+            <input
+              value={item.title}
+              onChange={(e) => updateItem(item.key, "title", e.target.value)}
+              placeholder="e.g. Doors open"
+              className="flex-1 h-8 px-2 rounded-lg font-body text-xs glass-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent/40"
+              aria-label="Title"
+              data-ocid={`agenda-title-input.${i + 1}`}
+            />
+            <button
+              type="button"
+              onClick={() => toggleExpand(item.key)}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-muted/50 transition-colors flex-shrink-0"
+              aria-label="Toggle description"
+            >
+              {expandedKeys.has(item.key) ? (
+                <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => removeItem(item.key)}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-destructive/10 transition-colors flex-shrink-0"
+              aria-label="Remove agenda item"
+              data-ocid={`agenda-remove-button.${i + 1}`}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {expandedKeys.has(item.key) && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-3 pb-3">
+                  <textarea
+                    value={item.description}
+                    onChange={(e) =>
+                      updateItem(item.key, "description", e.target.value)
+                    }
+                    placeholder="Optional description…"
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg font-body text-xs glass-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent/40 resize-none"
+                    data-ocid={`agenda-description-input.${i + 1}`}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={addItem}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-accent/30 text-sm font-body text-accent hover:border-accent/60 hover:bg-accent/5 transition-all duration-200"
+        data-ocid="agenda-add-button"
+      >
+        <Plus className="w-4 h-4" />
+        Add Agenda Item
+      </button>
+    </div>
+  );
+}
+
+// ── EditMomentPage ────────────────────────────────────────────────────────────
+
 export function EditMomentPage() {
   const { momentId } = useParams({ from: "/moments/$momentId/edit" });
   const { actor } = useBackend();
@@ -156,6 +313,7 @@ export function EditMomentPage() {
   const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(null);
   const [existingCoverBlob, setExistingCoverBlob] =
     useState<ExternalBlob | null>(null);
+  const [maxAttendees, setMaxAttendees] = useState<string>("");
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
@@ -168,6 +326,10 @@ export function EditMomentPage() {
     useState<EndConditionType>("never");
   const [endCount, setEndCount] = useState(10);
   const [endDate, setEndDate] = useState("");
+
+  // Agenda state
+  const [agendaItems, setAgendaItems] = useState<AgendaItemDraft[]>([]);
+  const [agendaNextKey, setAgendaNextKey] = useState(100);
 
   const toggleDay = (val: bigint) => {
     setDaysOfWeek((prev) =>
@@ -196,9 +358,17 @@ export function EditMomentPage() {
       setTime(tsToTimeStr(moment.eventDate));
       setVisibility(normalizeVisibility(moment.visibility));
       setTags(moment.tags);
+      setMaxAttendees(
+        moment.maxAttendees ? moment.maxAttendees.toString() : "",
+      );
       if (moment.coverImage) {
         setExistingCoverUrl(moment.coverImage.getDirectURL());
         setExistingCoverBlob(moment.coverImage);
+      }
+      // Agenda
+      if (moment.agendaItems.length > 0) {
+        setAgendaItems(agendaFromBackend(moment.agendaItems));
+        setAgendaNextKey(moment.agendaItems.length + 100);
       }
       // Recurrence
       if (moment.recurrence) {
@@ -292,6 +462,9 @@ export function EditMomentPage() {
           )
         : undefined;
 
+      const parsedMax =
+        maxAttendees.trim() !== "" ? BigInt(maxAttendees) : undefined;
+
       await actor.updateMoment(momentId, {
         title: title.trim(),
         description: description.trim(),
@@ -303,6 +476,14 @@ export function EditMomentPage() {
         visibility,
         coverImage,
         recurrence,
+        maxAttendees: parsedMax,
+        agendaItems: agendaItems
+          .filter((i) => i.title.trim())
+          .map((i) => ({
+            title: i.title.trim(),
+            time: i.time.trim(),
+            description: i.description.trim() || undefined,
+          })),
       });
     },
     onSuccess: async () => {
@@ -474,6 +655,28 @@ export function EditMomentPage() {
                             className={glassTextarea}
                             data-ocid="edit-moment-description"
                           />
+                        </div>
+
+                        {/* Max Attendees */}
+                        <div className="glass-card rounded-2xl p-4">
+                          <SectionLabel>
+                            <span className="flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5" />
+                              Max Attendees (optional)
+                            </span>
+                          </SectionLabel>
+                          <input
+                            type="number"
+                            value={maxAttendees}
+                            min={1}
+                            onChange={(e) => setMaxAttendees(e.target.value)}
+                            placeholder="Leave blank for unlimited"
+                            className={glassInput}
+                            data-ocid="edit-moment-max-attendees"
+                          />
+                          <p className="text-xs text-muted-foreground font-body mt-1.5">
+                            Once full, new RSVPs join a waitlist.
+                          </p>
                         </div>
 
                         <div className="glass-card rounded-2xl p-4">
@@ -958,6 +1161,22 @@ export function EditMomentPage() {
                               </AnimatePresence>
                             </div>
                           )}
+                        </div>
+
+                        {/* Agenda */}
+                        <div className="glass-card rounded-2xl p-4">
+                          <SectionLabel>
+                            <span className="flex items-center gap-1.5">
+                              <AlarmClock className="w-3.5 h-3.5" />
+                              Agenda / Schedule (optional)
+                            </span>
+                          </SectionLabel>
+                          <AgendaEditor
+                            items={agendaItems}
+                            onChange={setAgendaItems}
+                            nextKey={agendaNextKey}
+                            setNextKey={setAgendaNextKey}
+                          />
                         </div>
                       </div>
                     )}

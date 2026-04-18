@@ -28,6 +28,16 @@ module {
     endCondition : RecurrenceEndCondition;
   };
 
+  // ── Agenda ────────────────────────────────────────────────────────────────
+
+  // One item on a moment's agenda/schedule
+  public type AgendaItem = {
+    id : Nat;
+    time : Text;   // human-readable time string, e.g. "7:00 PM"
+    title : Text;
+    description : ?Text;
+  };
+
   public type Moment = {
     id : Common.MomentId;
     owner : Common.UserId;
@@ -44,6 +54,10 @@ module {
     updatedAt : Common.Timestamp;
     // null = non-recurring moment; ?rule = recurring moment
     recurrence : ?RecurrenceRule;
+    // null = unlimited capacity
+    maxAttendees : ?Nat;
+    // Ordered list of agenda items; IDs auto-assigned on create/update
+    agendaItems : [AgendaItem];
   };
 
   public type CreateMomentInput = {
@@ -57,6 +71,9 @@ module {
     coverImage : ?Storage.ExternalBlob;
     visibility : Visibility;
     recurrence : ?RecurrenceRule;
+    maxAttendees : ?Nat;
+    // Agenda items provided without IDs; IDs are auto-assigned
+    agendaItems : [{ time : Text; title : Text; description : ?Text }];
   };
 
   public type UpdateMomentInput = {
@@ -71,6 +88,9 @@ module {
     visibility : Visibility;
     // "edit all": replaces the recurrence rule for all future occurrences
     recurrence : ?RecurrenceRule;
+    maxAttendees : ?Nat;
+    // Agenda items provided without IDs; IDs are auto-assigned
+    agendaItems : [{ time : Text; title : Text; description : ?Text }];
   };
 
   public type AccessStatus = { #approved; #pending; #denied; #revoked };
@@ -117,6 +137,8 @@ module {
     occurrenceDate : ?Common.Timestamp;
     // Non-null when moment has a recurrence rule
     recurrence : ?RecurrenceRule;
+    maxAttendees : ?Nat;
+    waitlistCount : Nat;
   };
 
   public type MomentDetail = {
@@ -137,6 +159,9 @@ module {
     callerAccessStatus : ?AccessStatus;
     isOwner : Bool;
     recurrence : ?RecurrenceRule;
+    maxAttendees : ?Nat;
+    waitlistCount : Nat;
+    agendaItems : [AgendaItem];
   };
 
   // ── Bulk import ────────────────────────────────────────────────────────────

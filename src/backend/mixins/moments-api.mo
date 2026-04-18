@@ -156,6 +156,11 @@ mixin (
     MomentsLib.listAttendees(momentsState, momentId);
   };
 
+  // Returns the ordered waitlist for a moment (userId array, first = next to be promoted)
+  public query func getMomentWaitlist(momentId : Common.MomentId) : async [Common.UserId] {
+    MomentsLib.getMomentWaitlist(momentsState, momentId);
+  };
+
   // Returns the caller's attendance info for a moment, used to generate the
   // Event Pass QR code. Only returns data when the caller is attending the moment.
   public query ({ caller }) func getMyAttendanceInfo(momentId : Common.MomentId) : async ?T.AttendanceInfo {

@@ -93,4 +93,34 @@ mixin (
     };
     UsersLib.deleteUser(usersState, userId);
   };
+
+  // ── Bookmarks ─────────────────────────────────────────────────────────────
+
+  public shared ({ caller }) func bookmarkMoment(momentId : Common.MomentId) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: must be logged in");
+    };
+    UsersLib.bookmarkMoment(usersState, caller, momentId);
+  };
+
+  public shared ({ caller }) func unbookmarkMoment(momentId : Common.MomentId) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: must be logged in");
+    };
+    UsersLib.unbookmarkMoment(usersState, caller, momentId);
+  };
+
+  public query ({ caller }) func getMyBookmarks() : async [Common.MomentId] {
+    if (caller.isAnonymous()) {
+      return [];
+    };
+    UsersLib.getBookmarks(usersState, caller);
+  };
+
+  public query ({ caller }) func isBookmarked(momentId : Common.MomentId) : async Bool {
+    if (caller.isAnonymous()) {
+      return false;
+    };
+    UsersLib.isBookmarked(usersState, caller, momentId);
+  };
 };

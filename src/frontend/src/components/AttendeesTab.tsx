@@ -2,9 +2,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { UserMinus, UserPlus, Users } from "lucide-react";
+import { Clock, UserMinus, UserPlus, Users } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
-import { useBackend } from "../hooks/use-backend";
+import { useBackend, useMomentWaitlist } from "../hooks/use-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { showError, showSuccess } from "../lib/toast";
 import { RsvpStatus } from "../types";
@@ -13,6 +13,8 @@ import { EmptyState } from "./EmptyState";
 
 interface AttendeesTabProps {
   momentId: string;
+  maxAttendees?: bigint;
+  isOwner?: boolean;
 }
 
 const RSVP_LABELS: Record<RsvpStatus, string> = {
@@ -21,7 +23,6 @@ const RSVP_LABELS: Record<RsvpStatus, string> = {
   [RsvpStatus.notAttending]: "Not Attending",
 };
 
-// Glass pill color per RSVP status
 const RSVP_DOT: Record<RsvpStatus, string> = {
   [RsvpStatus.attending]: "bg-accent",
   [RsvpStatus.maybe]: "bg-yellow-400",
@@ -82,7 +83,7 @@ function AttendeeRow({ attendee, isOwnProfile }: AttendeeRowProps) {
 
   return (
     <div
-      className="glass-card rounded-2xl flex items-center justify-between gap-3 px-4 py-3 animate-slide-up"
+      className="glass-card rounded-2xl flex items-center justify-between gap-3 px-4 py-3"
       data-ocid="attendee-row"
     >
       <button
@@ -111,7 +112,6 @@ function AttendeeRow({ attendee, isOwnProfile }: AttendeeRowProps) {
           <span className="font-body font-semibold text-sm text-foreground truncate">
             {profile ? `@${profile.username}` : "Loading…"}
           </span>
-          {/* Glass RSVP badge */}
           <span className="inline-flex items-center gap-1.5 glass-card rounded-full px-2 py-0.5 w-fit">
             <span
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${RSVP_DOT[attendee.rsvpStatus]}`}
@@ -151,7 +151,83 @@ function AttendeeRow({ attendee, isOwnProfile }: AttendeeRowProps) {
   );
 }
 
-export function AttendeesTab({ momentId }: AttendeesTabProps) {
+// ── Waitlist Section ───────────────────────────────────────────────────────────
+
+function WaitlistSection({
+  momentId,
+  isOwner,
+}: {
+  momentId: string;
+  isOwner: boolean;
+}) {
+  const { data: waitlist, isLoading } = useMomentWaitlist(momentId);
+  const { actor } = useBackend();
+
+  const userProfiles = useQuery({
+    queryKey: ["waitlistProfiles", momentId],
+    queryFn: async () => {
+      if (!actor || !waitlist || waitlist.length === 0) return [];
+      const profiles = await Promise.all(
+        waitlist.map((userId) => actor.getUserProfile(userId)),
+      );
+      return profiles;
+    },
+    enabled: !!actor && !!waitlist && waitlist.length > 0,
+  });
+
+  if (isLoading) return null;
+  if (!waitlist || waitlist.length === 0) return null;
+  if (!isOwner && waitlist.length === 0) return null;
+
+  return (
+    <div className="space-y-2 mt-6" data-ocid="waitlist-section">
+      <div className="flex items-center gap-2 px-1 mb-3">
+        <Clock className="w-4 h-4 text-muted-foreground" />
+        <p className="text-sm font-body font-semibold text-muted-foreground">
+          Waitlist ({waitlist.length})
+        </p>
+      </div>
+      {userProfiles.data?.map((profile, i) => (
+        <div
+          key={waitlist[i]?.toString() ?? i}
+          className="glass-card rounded-2xl flex items-center gap-3 px-4 py-3"
+          data-ocid={`waitlist-item.${i + 1}`}
+        >
+          <Avatar className="w-9 h-9 flex-shrink-0 ring-2 ring-border">
+            {profile?.photo && (
+              <AvatarImage
+                src={profile.photo.getDirectURL()}
+                alt={profile?.username ?? ""}
+              />
+            )}
+            <AvatarFallback className="font-display font-bold text-xs bg-muted text-muted-foreground">
+              {profile ? profile.username.slice(0, 2).toUpperCase() : "?"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col min-w-0">
+            <span className="font-body font-semibold text-sm text-foreground truncate">
+              {profile ? `@${profile.username}` : `Position ${i + 1}`}
+            </span>
+            <span className="text-xs text-muted-foreground font-body">
+              Position #{i + 1} on waitlist
+            </span>
+          </div>
+          <span className="ml-auto flex-shrink-0 text-xs font-body font-semibold text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">
+            Waitlisted
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── AttendeesTab ───────────────────────────────────────────────────────────────
+
+export function AttendeesTab({
+  momentId,
+  maxAttendees,
+  isOwner = false,
+}: AttendeesTabProps) {
   const { actor, isFetching } = useBackend();
   const { principal } = useAuth();
 
@@ -194,18 +270,25 @@ export function AttendeesTab({ momentId }: AttendeesTabProps) {
   }
 
   return (
-    <div className="pt-2 space-y-2" data-ocid="attendees-list">
-      {attendeesQuery.data.map((attendee) => {
-        const isOwnProfile =
-          !!principal && attendee.userId.toText() === principal.toText();
-        return (
-          <AttendeeRow
-            key={attendee.userId.toText()}
-            attendee={attendee}
-            isOwnProfile={isOwnProfile}
-          />
-        );
-      })}
+    <div className="pt-2" data-ocid="attendees-list">
+      <div className="space-y-2">
+        {attendeesQuery.data.map((attendee) => {
+          const isOwnProfile =
+            !!principal && attendee.userId.toText() === principal.toText();
+          return (
+            <AttendeeRow
+              key={attendee.userId.toText()}
+              attendee={attendee}
+              isOwnProfile={isOwnProfile}
+            />
+          );
+        })}
+      </div>
+
+      {/* Waitlist — only shown when capacity is set */}
+      {maxAttendees && (
+        <WaitlistSection momentId={momentId} isOwner={isOwner} />
+      )}
     </div>
   );
 }

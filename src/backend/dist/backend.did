@@ -24,10 +24,14 @@ type UserRole =
  };
 type UserProfilePublic = 
  record {
+   attendedCount: nat;
    createdAt: Timestamp;
    followersCount: nat;
    followingCount: nat;
+   hideAttendingList: bool;
+   hostedCount: nat;
    id: UserId;
+   isPrivateProfile: bool;
    location: opt text;
    name: opt text;
    paymentDetails: opt vec PaymentDetail;
@@ -46,12 +50,18 @@ type UploadMediaInput =
  };
 type UpdateMomentInput = 
  record {
+   agendaItems: vec record {
+                      description: opt text;
+                      time: text;
+                      title: text;
+                    };
    coverImage: opt ExternalBlob;
    description: text;
    eventDate: Timestamp;
    location: text;
    locationLat: opt float64;
    locationLng: opt float64;
+   maxAttendees: opt nat;
    recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
@@ -65,6 +75,8 @@ type SocialLink =
  };
 type SaveProfileInput = 
  record {
+   hideAttendingList: bool;
+   isPrivateProfile: bool;
    location: opt text;
    name: opt text;
    paymentDetails: opt vec PaymentDetail;
@@ -103,6 +115,25 @@ type PaymentDetail =
    name: text;
    value: text;
  };
+type NotificationKind = 
+ variant {
+   accessRequestResolved;
+   mentioned;
+   newAnnouncement;
+   newFollower;
+   newMessage;
+   rsvpToYourMoment;
+ };
+type Notification = 
+ record {
+   createdAt: Timestamp;
+   id: nat;
+   isRead: bool;
+   kind: NotificationKind;
+   message: text;
+   recipientId: UserId;
+   referenceId: opt text;
+ };
 type MomentListItem = 
  record {
    attendeeCount: nat;
@@ -115,16 +146,19 @@ type MomentListItem =
    location: text;
    locationLat: opt float64;
    locationLng: opt float64;
+   maxAttendees: opt nat;
    occurrenceDate: opt Timestamp;
    owner: UserId;
    recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
    visibility: Visibility;
+   waitlistCount: nat;
  };
 type MomentId = text;
 type MomentDetail = 
  record {
+   agendaItems: vec AgendaItem;
    attendeeCount: nat;
    callerAccessStatus: opt AccessStatus;
    coverImage: opt ExternalBlob;
@@ -136,12 +170,23 @@ type MomentDetail =
    location: text;
    locationLat: opt float64;
    locationLng: opt float64;
+   maxAttendees: opt nat;
    owner: UserId;
    recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
    updatedAt: Timestamp;
    visibility: Visibility;
+   waitlistCount: nat;
+ };
+type Message = 
+ record {
+   createdAt: Timestamp;
+   id: nat;
+   isRead: bool;
+   recipientId: UserId;
+   senderId: UserId;
+   "text": text;
  };
 type MemoryWithAuthor = 
  record {
@@ -200,12 +245,18 @@ type Folder =
 type ExternalBlob = blob;
 type CreateMomentInput = 
  record {
+   agendaItems: vec record {
+                      description: opt text;
+                      time: text;
+                      title: text;
+                    };
    coverImage: opt ExternalBlob;
    description: text;
    eventDate: Timestamp;
    location: text;
    locationLat: opt float64;
    locationLng: opt float64;
+   maxAttendees: opt nat;
    recurrence: opt RecurrenceRule;
    tags: vec text;
    title: text;
@@ -215,6 +266,12 @@ type CreateFolderInput =
  record {
    momentId: MomentId;
    name: text;
+ };
+type ConversationSummary = 
+ record {
+   lastMessage: Message;
+   unreadCount: nat;
+   userId: UserId;
  };
 type CommentId = nat;
 type Comment = 
@@ -273,11 +330,41 @@ type AttendanceInfo =
    status: text;
    username: text;
  };
+type Announcement = 
+ record {
+   authorId: UserId;
+   createdAt: Timestamp;
+   id: nat;
+   momentId: MomentId;
+   "text": text;
+ };
+type AgendaItem = 
+ record {
+   description: opt text;
+   id: nat;
+   time: text;
+   title: text;
+ };
 type AddCommentInput = 
  record {
    mediaId: MediaId;
    parentId: opt CommentId;
    "text": text;
+ };
+type ActivityKind = 
+ variant {
+   createdMoment;
+   followedUser;
+   rsvpdToMoment;
+ };
+type ActivityEvent = 
+ record {
+   actorId: UserId;
+   createdAt: Timestamp;
+   id: nat;
+   kind: ActivityKind;
+   momentId: opt MomentId;
+   targetUserId: opt UserId;
  };
 type AccessStatus = 
  variant {
@@ -316,8 +403,10 @@ service : {
   adminListMoments: () -> (vec MomentListItem) query;
   adminListUsers: () -> (vec UserProfilePublic) query;
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  bookmarkMoment: (momentId: MomentId) -> ();
   createFolder: (input: CreateFolderInput) -> (FolderId);
   createMoment: (input: CreateMomentInput) -> (MomentId);
+  deleteAnnouncement: (momentId: MomentId, announcementId: nat) -> ();
   deleteComment: (commentId: CommentId) -> ();
   deleteFolder: (folderId: FolderId) -> ();
   deleteMedia: (mediaId: MediaId) -> ();
@@ -327,8 +416,11 @@ service : {
                                          });
   deleteMoment: (momentId: MomentId) -> ();
   followUser: (target: UserId) -> ();
+  getActivityFeed: () -> (vec ActivityEvent) query;
+  getAnnouncementsForMoment: (momentId: MomentId) -> (vec Announcement) query;
   getCallerUserProfile: () -> (opt UserProfilePublic) query;
   getCallerUserRole: () -> (UserRole) query;
+  getConversation: (otherUserId: UserId) -> (vec Message) query;
   getEventPassInfo: (momentId: MomentId, userId: UserId) ->
    (variant {
       err: text;
@@ -349,14 +441,21 @@ service : {
   getMomentPublicUrl: (momentId: MomentId) -> (text) query;
   getMomentQrCode: (momentId: MomentId) -> (text) query;
   getMomentShareUrl: (momentId: MomentId) -> (text) query;
+  getMomentWaitlist: (momentId: MomentId) -> (vec UserId) query;
   getMomentsForUser: (userId: UserId) -> (vec MomentListItem) query;
   getMyAttendanceInfo: (momentId: MomentId) -> (opt AttendanceInfo) query;
+  getMyBookmarks: () -> (vec MomentId) query;
   getMyCalendarMoments: (rangeStart: Timestamp, rangeEnd: Timestamp) ->
    (vec MomentListItem) query;
+  getMyConversations: () -> (vec ConversationSummary) query;
   getMyMoments: () -> (vec MomentListItem) query;
+  getMyNotifications: () -> (vec Notification) query;
+  getUnreadMessageCount: () -> (nat) query;
+  getUnreadNotificationCount: () -> (nat) query;
   getUserProfile: (userId: UserId) -> (opt UserProfilePublic) query;
   getUserProfileByUsername: (username: text) -> (opt UserProfilePublic) query;
   hasLikedMedia: (mediaId: MediaId) -> (bool) query;
+  isBookmarked: (momentId: MomentId) -> (bool) query;
   isCallerAdmin: () -> (bool) query;
   isFollowingUser: (target: UserId) -> (bool) query;
   isUsernameTaken: (username: text) -> (bool) query;
@@ -367,6 +466,10 @@ service : {
   listMediaByFolder: (folderId: FolderId, offset: nat, limit: nat) ->
    (MediaPage) query;
   listMomentAccessRequests: (momentId: MomentId) -> (vec AccessRequest) query;
+  markAllNotificationsRead: () -> ();
+  markConversationRead: (otherUserId: UserId) -> ();
+  markNotificationRead: (id: nat) -> ();
+  postAnnouncement: (momentId: MomentId, "text": text) -> (Announcement);
   postMemory: (momentId: MomentId, content: text, mediaBlob:
    opt ExternalBlob, mediaKind: opt MemoryMediaKind) ->
    (variant {
@@ -385,8 +488,10 @@ service : {
    opt Timestamp, dateRangeEnd: opt Timestamp, locationLat: opt float64,
    locationLng: opt float64, radiusKm: opt float64, offset: nat, limit:
    nat) -> (vec MomentListItem) query;
+  sendMessage: (recipientId: UserId, "text": text) -> (nat);
   setRsvp: (momentId: MomentId, status: RsvpStatus) -> ();
   toggleLike: (mediaId: MediaId) -> (nat);
+  unbookmarkMoment: (momentId: MomentId) -> ();
   unfollowUser: (target: UserId) -> ();
   updateMoment: (momentId: MomentId, input: UpdateMomentInput) -> ();
   uploadMedia: (input: UploadMediaInput) -> (MediaId);

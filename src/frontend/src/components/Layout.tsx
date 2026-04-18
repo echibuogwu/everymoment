@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,9 +11,13 @@ import {
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "@tanstack/react-router";
 import {
+  Activity,
+  Bell,
+  Bookmark,
   Compass,
   Home,
   LogOut,
+  MessageCircle,
   Moon,
   Plus,
   ShieldCheck,
@@ -20,16 +25,14 @@ import {
   Sun,
   User,
 } from "lucide-react";
-import {
-  AnimatePresence,
-  motion,
-  useMotionValue,
-  useScroll,
-  useTransform,
-} from "motion/react";
+import { AnimatePresence, motion, useScroll } from "motion/react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/use-auth";
+import {
+  useUnreadMessageCount,
+  useUnreadNotificationCount,
+} from "../hooks/use-backend";
 import { useIsAdmin, useProfile } from "../hooks/use-profile";
 
 interface LayoutProps {
@@ -99,6 +102,29 @@ function ThemeToggle() {
   );
 }
 
+function NotificationBell() {
+  const { isAuthenticated } = useAuth();
+  const { data: count = 0 } = useUnreadNotificationCount();
+
+  if (!isAuthenticated) return null;
+
+  return (
+    <Link
+      to="/notifications"
+      className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-white/10 transition-colors duration-200 text-foreground/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`Notifications${count > 0 ? ` (${count} unread)` : ""}`}
+      data-ocid="notification-bell"
+    >
+      <Bell className="w-4 h-4" />
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-0.5 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground leading-none">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function GlassHeader({ scrolled }: { scrolled: boolean }) {
   const { isAuthenticated, logout, login, isLoggingIn } = useAuth();
   const { profile } = useProfile();
@@ -146,8 +172,9 @@ function GlassHeader({ scrolled }: { scrolled: boolean }) {
         </Link>
 
         {/* Right actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <ThemeToggle />
+          <NotificationBell />
 
           {isAuthenticated && (
             <motion.div whileTap={{ scale: 0.93 }}>
@@ -215,6 +242,36 @@ function GlassHeader({ scrolled }: { scrolled: boolean }) {
                     My Moments
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/messages"
+                    className="flex items-center gap-2 cursor-pointer"
+                    data-ocid="nav-messages"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Messages
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/saved"
+                    className="flex items-center gap-2 cursor-pointer"
+                    data-ocid="nav-saved"
+                  >
+                    <Bookmark className="w-4 h-4" />
+                    Saved Moments
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/activity"
+                    className="flex items-center gap-2 cursor-pointer"
+                    data-ocid="nav-activity"
+                  >
+                    <Activity className="w-4 h-4" />
+                    Activity Feed
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => logout()}
@@ -252,11 +309,23 @@ function GlassHeader({ scrolled }: { scrolled: boolean }) {
 const NAV_ITEMS_AUTH = [
   { to: "/dashboard", label: "Home", icon: Home },
   { to: "/explore", label: "Explore", icon: Compass },
+  { to: "/messages", label: "Messages", icon: MessageCircle },
+  { to: "/saved", label: "Saved", icon: Bookmark },
 ] as const;
 
 const NAV_ITEMS_GUEST = [
   { to: "/explore", label: "Explore", icon: Compass },
 ] as const;
+
+function NavMessagesBadge() {
+  const { data: count = 0 } = useUnreadMessageCount();
+  if (count === 0) return null;
+  return (
+    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[14px] h-3.5 px-0.5 rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground leading-none">
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
 
 function FloatingBottomNav({
   scrollingDown,
@@ -276,7 +345,6 @@ function FloatingBottomNav({
       ]
     : [...NAV_ITEMS_GUEST];
 
-  // Build full items list with create button slot for authenticated users
   const showCreate = isAuthenticated;
 
   return (
@@ -311,7 +379,7 @@ function FloatingBottomNav({
               key={to}
               to={to}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-0.5 px-4 py-2 rounded-full transition-colors duration-200",
+                "relative flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-full transition-colors duration-200",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isActive
                   ? "text-accent"
@@ -344,11 +412,14 @@ function FloatingBottomNav({
                 transition={{ type: "spring", stiffness: 500, damping: 25 }}
                 className="relative z-10 flex flex-col items-center gap-0.5"
               >
-                <Icon
-                  size={20}
-                  strokeWidth={isActive ? 2.25 : 1.75}
-                  className="w-5 h-5"
-                />
+                <span className="relative">
+                  <Icon
+                    size={20}
+                    strokeWidth={isActive ? 2.25 : 1.75}
+                    className="w-5 h-5"
+                  />
+                  {label === "Messages" && <NavMessagesBadge />}
+                </span>
                 <span className="text-[9px] font-body font-medium leading-none tracking-wide">
                   {label}
                 </span>

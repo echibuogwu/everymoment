@@ -50,6 +50,24 @@ const ShareMomentPage = lazy(() =>
 const EventPassPage = lazy(() =>
   import("./pages/EventPassPage").then((m) => ({ default: m.EventPassPage })),
 );
+const MessagesPage = lazy(() =>
+  import("./pages/MessagesPage").then((m) => ({ default: m.MessagesPage })),
+);
+const NotificationsPage = lazy(() =>
+  import("./pages/NotificationsPage").then((m) => ({
+    default: m.NotificationsPage,
+  })),
+);
+const SavedMomentsPage = lazy(() =>
+  import("./pages/SavedMomentsPage").then((m) => ({
+    default: m.SavedMomentsPage,
+  })),
+);
+const ActivityFeedPage = lazy(() =>
+  import("./pages/ActivityFeedPage").then((m) => ({
+    default: m.ActivityFeedPage,
+  })),
+);
 
 function PageFallback() {
   return <LoadingSpinner fullScreen />;
@@ -168,6 +186,57 @@ const adminRoute = createRoute({
   ),
 });
 
+// Public event pass route — /event-pass/:momentId/:userId (no auth required)
+const eventPassRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/event-pass/$momentId/$userId",
+  component: () => (
+    <Suspense fallback={<PageFallback />}>
+      <EventPassPage />
+    </Suspense>
+  ),
+});
+
+const messagesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/messages",
+  component: () => (
+    <Suspense fallback={<PageFallback />}>
+      <MessagesPage />
+    </Suspense>
+  ),
+});
+
+const notificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/notifications",
+  component: () => (
+    <Suspense fallback={<PageFallback />}>
+      <NotificationsPage />
+    </Suspense>
+  ),
+});
+
+const savedMomentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/saved",
+  component: () => (
+    <Suspense fallback={<PageFallback />}>
+      <SavedMomentsPage />
+    </Suspense>
+  ),
+});
+
+const activityFeedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  component: () => (
+    <Suspense fallback={<PageFallback />}>
+      <ActivityFeedPage />
+    </Suspense>
+  ),
+});
+
 /**
  * Index route — smart redirect without hard browser navigation.
  *
@@ -208,17 +277,6 @@ const indexRoute = createRoute({
   component: IndexRedirect,
 });
 
-// Public event pass route — /event-pass/:momentId/:userId (no auth required)
-const eventPassRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/event-pass/$momentId/$userId",
-  component: () => (
-    <Suspense fallback={<PageFallback />}>
-      <EventPassPage />
-    </Suspense>
-  ),
-});
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -232,6 +290,10 @@ const routeTree = rootRoute.addChildren([
   profileRoute,
   adminRoute,
   eventPassRoute,
+  messagesRoute,
+  notificationsRoute,
+  savedMomentsRoute,
+  activityFeedRoute,
 ]);
 
 const router = createRouter({ routeTree });

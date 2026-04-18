@@ -1,8 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Plus, Sparkles } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Activity, CalendarDays, Plus, Sparkles } from "lucide-react";
+import { motion } from "motion/react";
+import { useState } from "react";
 import { AuthGuard } from "../components/AuthGuard";
 import { CalendarView } from "../components/CalendarView";
 import { Layout } from "../components/Layout";
@@ -10,6 +11,8 @@ import { MomentCard } from "../components/MomentCard";
 import { useBackend } from "../hooks/use-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
 import type { MomentListItem } from "../types";
+
+type DashboardTab = "calendar" | "moments" | "activity";
 
 function MomentGridSkeleton() {
   return (
@@ -38,9 +41,20 @@ function StatBadge({ label, value }: { label: string; value: number }) {
   );
 }
 
+const TAB_ITEMS: {
+  id: DashboardTab;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { id: "calendar", label: "Calendar", icon: CalendarDays },
+  { id: "moments", label: "My Moments", icon: Sparkles },
+  { id: "activity", label: "Activity", icon: Activity },
+];
+
 export function DashboardPage() {
   const { actor } = useBackend();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<DashboardTab>("calendar");
 
   const { data: moments, isLoading } = useQuery<MomentListItem[]>({
     queryKey: QUERY_KEYS.myMoments,
@@ -100,92 +114,136 @@ export function DashboardPage() {
             </div>
           </motion.div>
 
-          {/* Calendar section */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
+          {/* Tab switcher */}
+          <div
+            className="flex items-center gap-1 p-1 glass-card rounded-2xl"
+            data-ocid="dashboard.tabs"
           >
-            <CalendarView />
-          </motion.div>
-
-          {/* My Moments section */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.18 }}
-            className="space-y-3"
-          >
-            <h2 className="font-display font-semibold text-base bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent px-1">
-              All Moments
-            </h2>
-
-            {isLoading ? (
-              <MomentGridSkeleton />
-            ) : !moments || moments.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.35, ease: [0.34, 1.2, 0.64, 1] }}
-                className="glass-card rounded-3xl p-8 flex flex-col items-center text-center space-y-4"
-                data-ocid="dashboard-empty-state"
-              >
-                <div className="w-16 h-16 rounded-full bg-[oklch(var(--accent)/0.12)] flex items-center justify-center">
-                  <CalendarDays className="w-8 h-8 text-[oklch(var(--accent))]" />
-                </div>
-                <div className="space-y-1.5">
-                  <h3 className="font-display font-semibold text-lg text-foreground">
-                    No moments yet
-                  </h3>
-                  <p className="text-sm text-muted-foreground max-w-xs">
-                    Create your first Moment to start capturing and sharing
-                    memories with the people who matter most.
-                  </p>
-                </div>
-                <motion.button
+            {TAB_ITEMS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
                   type="button"
-                  whileTap={{ scale: 0.95 }}
-                  whileHover={{ scale: 1.03 }}
-                  onClick={() => navigate({ to: "/moments/new" })}
-                  className="flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-[oklch(0.72_0.28_280)] to-[oklch(0.65_0.25_310)] text-white shadow-lg animate-glow-pulse"
-                  data-ocid="dashboard-empty-create-btn"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors duration-150 ${
+                    isActive
+                      ? "bg-accent text-accent-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                  }`}
+                  data-ocid={`dashboard.tab.${tab.id}`}
                 >
-                  <Plus className="w-4 h-4" />
-                  Create your first Moment
-                </motion.button>
-              </motion.div>
-            ) : (
-              <div
-                className="grid grid-cols-2 gap-3"
-                data-ocid="dashboard-moments-grid"
-              >
-                <AnimatePresence>
-                  {moments.map((moment, i) => (
-                    <motion.div
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tab content */}
+          {activeTab === "calendar" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <CalendarView />
+            </motion.div>
+          )}
+
+          {activeTab === "moments" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-3"
+            >
+              {isLoading ? (
+                <MomentGridSkeleton />
+              ) : !moments || moments.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.35, ease: [0.34, 1.2, 0.64, 1] }}
+                  className="glass-card rounded-3xl p-8 flex flex-col items-center text-center space-y-4"
+                  data-ocid="dashboard-empty-state"
+                >
+                  <div className="w-16 h-16 rounded-full bg-[oklch(var(--accent)/0.12)] flex items-center justify-center">
+                    <CalendarDays className="w-8 h-8 text-[oklch(var(--accent))]" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-display font-semibold text-lg text-foreground">
+                      No moments yet
+                    </h3>
+                    <p className="text-sm text-muted-foreground max-w-xs">
+                      Create your first Moment to start capturing and sharing
+                      memories with the people who matter most.
+                    </p>
+                  </div>
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.03 }}
+                    onClick={() => navigate({ to: "/moments/new" })}
+                    className="flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-[oklch(0.72_0.28_280)] to-[oklch(0.65_0.25_310)] text-white shadow-lg animate-glow-pulse"
+                    data-ocid="dashboard-empty-create-btn"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create your first Moment
+                  </motion.button>
+                </motion.div>
+              ) : (
+                <div
+                  className="grid grid-cols-2 gap-3"
+                  data-ocid="dashboard-moments-grid"
+                >
+                  {moments.map((moment) => (
+                    <MomentCard
                       key={moment.id.toString()}
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.35,
-                        delay: i * 0.06,
-                        ease: [0.34, 1.1, 0.64, 1],
-                      }}
-                    >
-                      <MomentCard
-                        moment={moment}
-                        onClick={() =>
-                          navigate({
-                            to: "/moments/$momentId",
-                            params: { momentId: moment.id.toString() },
-                          })
-                        }
-                      />
-                    </motion.div>
+                      moment={moment}
+                      onClick={() =>
+                        navigate({
+                          to: "/moments/$momentId",
+                          params: { momentId: moment.id.toString() },
+                        })
+                      }
+                    />
                   ))}
-                </AnimatePresence>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === "activity" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="glass-card rounded-2xl p-6 flex flex-col items-center gap-4 text-center"
+              data-ocid="dashboard.activity_panel"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-accent" />
               </div>
-            )}
-          </motion.div>
+              <div className="space-y-1">
+                <h3 className="font-display font-semibold text-base text-foreground">
+                  Activity Feed
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  See what people you follow are doing
+                </p>
+              </div>
+              <Link
+                to="/activity"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-sm font-semibold bg-accent text-accent-foreground transition-smooth hover:opacity-90"
+                data-ocid="dashboard.activity_cta"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                View full activity feed
+              </Link>
+            </motion.div>
+          )}
         </div>
 
         {/* Mobile FAB */}

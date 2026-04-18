@@ -26,6 +26,13 @@ export type {
   Timestamp,
   RecurrenceRule,
   RecurrenceEndCondition,
+  // New types
+  AgendaItem,
+  Announcement,
+  Notification,
+  Message,
+  ConversationSummary,
+  ActivityEvent,
 } from "../backend";
 
 export {
@@ -35,4 +42,7 @@ export {
   UserRole,
   Visibility,
   RecurrenceFrequency,
+  // New enums
+  NotificationKind,
+  ActivityKind,
 } from "../backend";

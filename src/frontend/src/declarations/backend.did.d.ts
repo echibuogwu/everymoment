@@ -21,10 +21,34 @@ export type AccessStatus = { 'revoked' : null } |
   { 'pending' : null } |
   { 'denied' : null } |
   { 'approved' : null };
+export interface ActivityEvent {
+  'id' : bigint,
+  'kind' : ActivityKind,
+  'createdAt' : Timestamp,
+  'momentId' : [] | [MomentId],
+  'actorId' : UserId,
+  'targetUserId' : [] | [UserId],
+}
+export type ActivityKind = { 'rsvpdToMoment' : null } |
+  { 'createdMoment' : null } |
+  { 'followedUser' : null };
 export interface AddCommentInput {
   'text' : string,
   'parentId' : [] | [CommentId],
   'mediaId' : MediaId,
+}
+export interface AgendaItem {
+  'id' : bigint,
+  'title' : string,
+  'time' : string,
+  'description' : [] | [string],
+}
+export interface Announcement {
+  'id' : bigint,
+  'authorId' : UserId,
+  'createdAt' : Timestamp,
+  'text' : string,
+  'momentId' : MomentId,
 }
 export interface AttendanceInfo {
   'status' : string,
@@ -69,12 +93,21 @@ export interface Comment {
   'mediaId' : MediaId,
 }
 export type CommentId = bigint;
+export interface ConversationSummary {
+  'userId' : UserId,
+  'lastMessage' : Message,
+  'unreadCount' : bigint,
+}
 export interface CreateFolderInput { 'name' : string, 'momentId' : MomentId }
 export interface CreateMomentInput {
   'locationLat' : [] | [number],
   'locationLng' : [] | [number],
   'title' : string,
+  'maxAttendees' : [] | [bigint],
   'tags' : Array<string>,
+  'agendaItems' : Array<
+    { 'title' : string, 'time' : string, 'description' : [] | [string] }
+  >,
   'description' : string,
   'recurrence' : [] | [RecurrenceRule],
   'coverImage' : [] | [ExternalBlob],
@@ -127,6 +160,14 @@ export interface MemoryWithAuthor {
   'mediaKind' : [] | [MemoryMediaKind],
   'authorDisplayName' : string,
 }
+export interface Message {
+  'id' : bigint,
+  'createdAt' : Timestamp,
+  'text' : string,
+  'isRead' : boolean,
+  'recipientId' : UserId,
+  'senderId' : UserId,
+}
 export interface MomentDetail {
   'id' : MomentId,
   'locationLat' : [] | [number],
@@ -135,12 +176,15 @@ export interface MomentDetail {
   'attendeeCount' : bigint,
   'callerAccessStatus' : [] | [AccessStatus],
   'owner' : UserId,
+  'maxAttendees' : [] | [bigint],
   'createdAt' : Timestamp,
   'tags' : Array<string>,
+  'agendaItems' : Array<AgendaItem>,
   'description' : string,
   'recurrence' : [] | [RecurrenceRule],
   'coverImage' : [] | [ExternalBlob],
   'updatedAt' : Timestamp,
+  'waitlistCount' : bigint,
   'visibility' : Visibility,
   'isOwner' : boolean,
   'location' : string,
@@ -154,6 +198,7 @@ export interface MomentListItem {
   'title' : string,
   'attendeeCount' : bigint,
   'owner' : UserId,
+  'maxAttendees' : [] | [bigint],
   'createdAt' : Timestamp,
   'tags' : Array<string>,
   'description' : string,
@@ -161,10 +206,26 @@ export interface MomentListItem {
   'coverImage' : [] | [ExternalBlob],
   'occurrenceDate' : [] | [Timestamp],
   'callerRelation' : [] | [CallerRelation],
+  'waitlistCount' : bigint,
   'visibility' : Visibility,
   'location' : string,
   'eventDate' : Timestamp,
 }
+export interface Notification {
+  'id' : bigint,
+  'kind' : NotificationKind,
+  'createdAt' : Timestamp,
+  'referenceId' : [] | [string],
+  'isRead' : boolean,
+  'message' : string,
+  'recipientId' : UserId,
+}
+export type NotificationKind = { 'accessRequestResolved' : null } |
+  { 'rsvpToYourMoment' : null } |
+  { 'mentioned' : null } |
+  { 'newAnnouncement' : null } |
+  { 'newFollower' : null } |
+  { 'newMessage' : null };
 export interface PaymentDetail { 'value' : string, 'name' : string }
 export type RecurrenceEndCondition = { 'endDate' : Timestamp } |
   { 'count' : bigint } |
@@ -184,9 +245,11 @@ export type RsvpStatus = { 'maybe' : null } |
   { 'attending' : null };
 export interface SaveProfileInput {
   'username' : string,
+  'hideAttendingList' : boolean,
   'name' : [] | [string],
   'socials' : [] | [Array<SocialLink>],
   'paymentDetails' : [] | [Array<PaymentDetail>],
+  'isPrivateProfile' : boolean,
   'photo' : [] | [ExternalBlob],
   'location' : [] | [string],
 }
@@ -196,7 +259,11 @@ export interface UpdateMomentInput {
   'locationLat' : [] | [number],
   'locationLng' : [] | [number],
   'title' : string,
+  'maxAttendees' : [] | [bigint],
   'tags' : Array<string>,
+  'agendaItems' : Array<
+    { 'title' : string, 'time' : string, 'description' : [] | [string] }
+  >,
   'description' : string,
   'recurrence' : [] | [RecurrenceRule],
   'coverImage' : [] | [ExternalBlob],
@@ -215,11 +282,15 @@ export type UserId = Principal;
 export interface UserProfilePublic {
   'id' : UserId,
   'username' : string,
+  'hideAttendingList' : boolean,
   'followersCount' : bigint,
   'name' : [] | [string],
   'createdAt' : Timestamp,
   'socials' : [] | [Array<SocialLink>],
   'paymentDetails' : [] | [Array<PaymentDetail>],
+  'isPrivateProfile' : boolean,
+  'hostedCount' : bigint,
+  'attendedCount' : bigint,
   'followingCount' : bigint,
   'photo' : [] | [ExternalBlob],
   'location' : [] | [string],
@@ -273,8 +344,10 @@ export interface _SERVICE {
   'adminListMoments' : ActorMethod<[], Array<MomentListItem>>,
   'adminListUsers' : ActorMethod<[], Array<UserProfilePublic>>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'bookmarkMoment' : ActorMethod<[MomentId], undefined>,
   'createFolder' : ActorMethod<[CreateFolderInput], FolderId>,
   'createMoment' : ActorMethod<[CreateMomentInput], MomentId>,
+  'deleteAnnouncement' : ActorMethod<[MomentId, bigint], undefined>,
   'deleteComment' : ActorMethod<[CommentId], undefined>,
   'deleteFolder' : ActorMethod<[FolderId], undefined>,
   'deleteMedia' : ActorMethod<[MediaId], undefined>,
@@ -285,8 +358,11 @@ export interface _SERVICE {
   >,
   'deleteMoment' : ActorMethod<[MomentId], undefined>,
   'followUser' : ActorMethod<[UserId], undefined>,
+  'getActivityFeed' : ActorMethod<[], Array<ActivityEvent>>,
+  'getAnnouncementsForMoment' : ActorMethod<[MomentId], Array<Announcement>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfilePublic]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getConversation' : ActorMethod<[UserId], Array<Message>>,
   'getEventPassInfo' : ActorMethod<
     [MomentId, UserId],
     { 'ok' : AttendanceInfo } |
@@ -307,16 +383,23 @@ export interface _SERVICE {
   'getMomentPublicUrl' : ActorMethod<[MomentId], string>,
   'getMomentQrCode' : ActorMethod<[MomentId], string>,
   'getMomentShareUrl' : ActorMethod<[MomentId], string>,
+  'getMomentWaitlist' : ActorMethod<[MomentId], Array<UserId>>,
   'getMomentsForUser' : ActorMethod<[UserId], Array<MomentListItem>>,
   'getMyAttendanceInfo' : ActorMethod<[MomentId], [] | [AttendanceInfo]>,
+  'getMyBookmarks' : ActorMethod<[], Array<MomentId>>,
   'getMyCalendarMoments' : ActorMethod<
     [Timestamp, Timestamp],
     Array<MomentListItem>
   >,
+  'getMyConversations' : ActorMethod<[], Array<ConversationSummary>>,
   'getMyMoments' : ActorMethod<[], Array<MomentListItem>>,
+  'getMyNotifications' : ActorMethod<[], Array<Notification>>,
+  'getUnreadMessageCount' : ActorMethod<[], bigint>,
+  'getUnreadNotificationCount' : ActorMethod<[], bigint>,
   'getUserProfile' : ActorMethod<[UserId], [] | [UserProfilePublic]>,
   'getUserProfileByUsername' : ActorMethod<[string], [] | [UserProfilePublic]>,
   'hasLikedMedia' : ActorMethod<[MediaId], boolean>,
+  'isBookmarked' : ActorMethod<[MomentId], boolean>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isFollowingUser' : ActorMethod<[UserId], boolean>,
   'isUsernameTaken' : ActorMethod<[string], boolean>,
@@ -325,6 +408,10 @@ export interface _SERVICE {
   'listMedia' : ActorMethod<[MomentId, bigint, bigint], MediaPage>,
   'listMediaByFolder' : ActorMethod<[FolderId, bigint, bigint], MediaPage>,
   'listMomentAccessRequests' : ActorMethod<[MomentId], Array<AccessRequest>>,
+  'markAllNotificationsRead' : ActorMethod<[], undefined>,
+  'markConversationRead' : ActorMethod<[UserId], undefined>,
+  'markNotificationRead' : ActorMethod<[bigint], undefined>,
+  'postAnnouncement' : ActorMethod<[MomentId, string], Announcement>,
   'postMemory' : ActorMethod<
     [MomentId, string, [] | [ExternalBlob], [] | [MemoryMediaKind]],
     { 'ok' : MemoryId } |
@@ -352,8 +439,10 @@ export interface _SERVICE {
     ],
     Array<MomentListItem>
   >,
+  'sendMessage' : ActorMethod<[UserId, string], bigint>,
   'setRsvp' : ActorMethod<[MomentId, RsvpStatus], undefined>,
   'toggleLike' : ActorMethod<[MediaId], bigint>,
+  'unbookmarkMoment' : ActorMethod<[MomentId], undefined>,
   'unfollowUser' : ActorMethod<[UserId], undefined>,
   'updateMoment' : ActorMethod<[MomentId, UpdateMomentInput], undefined>,
   'uploadMedia' : ActorMethod<[UploadMediaInput], MediaId>,

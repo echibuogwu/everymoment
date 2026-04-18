@@ -1,4 +1,4 @@
-// Version: 1.0.0
+// Version: 3.0.0
 type AccessRequest__504144355 =
   {
     momentId : MomentId__514222491;
@@ -8,6 +8,27 @@ type AccessRequest__504144355 =
     status : AccessStatus__752683970
   };
 type AccessStatus__752683970 = {#approved; #denied; #pending; #revoked};
+type ActivityEvent__523671481 =
+  {
+    actorId : UserId__158757552;
+    createdAt : Timestamp__301639476;
+    id : Nat;
+    kind : ActivityKind__356267438;
+    momentId : ?MomentId__514222491;
+    targetUserId : ?UserId__158757552
+  };
+type ActivityKind__356267438 =
+  {#createdMoment; #followedUser; #rsvpdToMoment};
+type AgendaItem__335853111 =
+  {description : ?Text; id : Nat; time : Text; title : Text};
+type Announcement__160704614 =
+  {
+    authorId : UserId__158757552;
+    createdAt : Timestamp__301639476;
+    id : Nat;
+    momentId : MomentId__514222491;
+    text : Text
+  };
 type Attendee__358347398 =
   {
     joinedAt : Timestamp__301639476;
@@ -29,6 +50,7 @@ type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
 type ExternalBlob__246066408 = Blob;
+type ExternalBlob__665380005 = ExternalBlob__246066408;
 type FolderId__432322121 = Nat;
 type Folder__373437713 =
   {
@@ -44,6 +66,13 @@ type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
 type Leaf__520550824<T> = {data : Data__159895909<T>};
 type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type List__415060402<T> = List__790383201<T>;
+type List__790383201<T> =
+  {
+    var blockIndex : Nat__490723111;
+    var blocks : [var [var ?T]];
+    var elementIndex : Nat__490723111
+  };
 type Map__158565046<K, V> = Map__297112838<K, V>;
 type Map__297112838<K, V> =
   {var root : Node__46230540<K, V>; var size : Nat__490723111};
@@ -74,9 +103,20 @@ type Memory__757955936 =
     mediaKind : ?MemoryMediaKind__848785012;
     momentId : MomentId__514222491
   };
+type Message__804209456 =
+  {
+    createdAt : Timestamp__301639476;
+    id : Nat;
+    isRead : Bool;
+    recipientId : UserId__158757552;
+    senderId : UserId__158757552;
+    text : Text
+  };
 type MomentId__514222491 = Text;
+type MomentId__54171308 = Text;
 type Moment__145803432 =
   {
+    agendaItems : [AgendaItem__335853111];
     coverImage : ?ExternalBlob__246066408;
     createdAt : Timestamp__301639476;
     description : Text;
@@ -85,6 +125,7 @@ type Moment__145803432 =
     location : Text;
     locationLat : ?Float;
     locationLng : ?Float;
+    maxAttendees : ?Nat;
     owner : UserId__158757552;
     recurrence : ?RecurrenceRule__1031207458;
     tags : [Text];
@@ -98,6 +139,105 @@ type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
 type Node__92254746<T> =
   {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
+type NotificationKind__631533211 =
+  {
+    #accessRequestResolved;
+    #mentioned;
+    #newAnnouncement;
+    #newFollower;
+    #newMessage;
+    #rsvpToYourMoment
+  };
+type Notification__264708741 =
+  {
+    createdAt : Timestamp__301639476;
+    id : Nat;
+    isRead : Bool;
+    kind : NotificationKind__631533211;
+    message : Text;
+    recipientId : UserId__158757552;
+    referenceId : ?Text
+  };
+type OldAccessRequest__20305292 =
+  {
+    momentId : MomentId__54171308;
+    requestedAt : Timestamp__817121181;
+    requester : UserId__2049225;
+    resolvedAt : ?Timestamp__817121181;
+    status : OldAccessStatus__716139410
+  };
+type OldAccessStatus__716139410 = {#approved; #denied; #pending; #revoked};
+type OldAttendee__836468086 =
+  {
+    joinedAt : Timestamp__817121181;
+    momentId : MomentId__54171308;
+    rsvpStatus : OldRsvpStatus__530448606;
+    userId : UserId__2049225
+  };
+type OldMoment__251237329 =
+  {
+    coverImage : ?ExternalBlob__665380005;
+    createdAt : Timestamp__817121181;
+    description : Text;
+    eventDate : Timestamp__817121181;
+    id : MomentId__54171308;
+    location : Text;
+    locationLat : ?Float;
+    locationLng : ?Float;
+    owner : UserId__2049225;
+    recurrence : ?OldRecurrenceRule__171140049;
+    tags : [Text];
+    title : Text;
+    updatedAt : Timestamp__817121181;
+    visibility : OldVisibility__622755988
+  };
+type OldMomentsState__583677832 =
+  {
+    accessRequests :
+      Map__605269027<(MomentId__54171308, UserId__2049225),
+                      OldAccessRequest__20305292>;
+    attendees :
+      Map__605269027<(MomentId__54171308, UserId__2049225),
+                      OldAttendee__836468086>;
+    grantedAccess :
+      Map__605269027<MomentId__54171308, Set__532252804<UserId__2049225>>;
+    var idCounter : Nat;
+    moments : Map__605269027<MomentId__54171308, OldMoment__251237329>
+  };
+type OldPaymentDetail__962199365 = {name : Text; value : Text};
+type OldRecurrenceEndCondition__305335618 =
+  {#count : Nat; #endDate : Timestamp__817121181; #never};
+type OldRecurrenceFrequency__424733864 = {#daily; #monthly; #weekly; #yearly};
+type OldRecurrenceRule__171140049 =
+  {
+    daysOfWeek : [Nat];
+    endCondition : OldRecurrenceEndCondition__305335618;
+    frequency : OldRecurrenceFrequency__424733864;
+    interval : Nat
+  };
+type OldRsvpStatus__530448606 = {#attending; #maybe; #notAttending};
+type OldSocialLink__623397246 = {name : Text; url : Text};
+type OldUserProfile__416069324 =
+  {
+    createdAt : Timestamp__817121181;
+    id : UserId__2049225;
+    location : ?Text;
+    name : ?Text;
+    paymentDetails : ?[OldPaymentDetail__962199365];
+    photo : ?ExternalBlob__665380005;
+    socials : ?[OldSocialLink__623397246];
+    username : Text
+  };
+type OldUsersState__396992953 =
+  {
+    followers :
+      Map__605269027<UserId__2049225, Set__532252804<UserId__2049225>>;
+    following :
+      Map__605269027<UserId__2049225, Set__532252804<UserId__2049225>>;
+    profiles : Map__605269027<UserId__2049225, OldUserProfile__416069324>;
+    usernameIndex : Map__605269027<Text, UserId__2049225>
+  };
+type OldVisibility__622755988 = {#private_; #public_};
 type PaymentDetail__1058553334 = {name : Text; value : Text};
 type RecurrenceEndCondition__300588335 =
   {#count : Nat; #endDate : Timestamp__301639476; #never};
@@ -115,11 +255,15 @@ type Set__710576254<T> =
   {var root : Node__92254746<T>; var size : Nat__490723111};
 type SocialLink__692406830 = {name : Text; url : Text};
 type Timestamp__301639476 = Int;
+type Timestamp__817121181 = Int;
 type UserId__158757552 = Principal;
+type UserId__2049225 = Principal;
 type UserProfile__277265826 =
   {
     createdAt : Timestamp__301639476;
+    hideAttendingList : Bool;
     id : UserId__158757552;
+    isPrivateProfile : Bool;
     location : ?Text;
     name : ?Text;
     paymentDetails : ?[PaymentDetail__1058553334];
@@ -129,11 +273,23 @@ type UserProfile__277265826 =
   };
 type UserRole__1054455867 = {#admin; #guest; #user};
 type Visibility__640576773 = {#private_; #public_};
-actor {
+actor ({
   stable accessControlState :
     {
       var adminAssigned : Bool;
       userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable activityState :
+    {
+      events : List__415060402<ActivityEvent__523671481>;
+      var nextEventId : Nat
+    };
+  stable announcementsState :
+    {
+      announcements :
+        Map__605269027<MomentId__514222491,
+                        List__415060402<Announcement__160704614>>;
+      var nextAnnouncementId : Nat
     };
   stable mediaState :
     {
@@ -151,21 +307,87 @@ actor {
       memories : Map__605269027<MemoryId__742482266, Memory__757955936>;
       var memoryCounter : Nat
     };
+  stable messagingState :
+    {
+      messages : Map__605269027<Text, List__415060402<Message__804209456>>;
+      var nextMessageId : Nat
+    };
+  in momentsState : OldMomentsState__583677832;
+  stable notificationsState :
+    {
+      var nextNotificationId : Nat;
+      notifications :
+        Map__605269027<UserId__158757552,
+                        List__415060402<Notification__264708741>>
+    };
+  in usersState : OldUsersState__396992953
+}, {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable activityState :
+    {
+      events : List__415060402<ActivityEvent__523671481>;
+      var nextEventId : Nat
+    };
+  stable announcementsState :
+    {
+      announcements :
+        Map__605269027<MomentId__514222491,
+                        List__415060402<Announcement__160704614>>;
+      var nextAnnouncementId : Nat
+    };
+  stable mediaState :
+    {
+      comments : Map__605269027<CommentId__821569710, Comment__497442883>;
+      folders : Map__605269027<FolderId__432322121, Folder__373437713>;
+      likes :
+        Map__605269027<MediaId__168331846, Set__532252804<UserId__158757552>>;
+      media : Map__605269027<MediaId__168331846, Media__924822250>;
+      var nextCommentId : CommentId__821569710;
+      var nextFolderId : FolderId__432322121;
+      var nextMediaId : MediaId__168331846
+    };
+  stable memoriesState :
+    {
+      memories : Map__605269027<MemoryId__742482266, Memory__757955936>;
+      var memoryCounter : Nat
+    };
+  stable messagingState :
+    {
+      messages : Map__605269027<Text, List__415060402<Message__804209456>>;
+      var nextMessageId : Nat
+    };
   stable momentsState :
     {
       accessRequests :
         Map__605269027<(MomentId__514222491, UserId__158757552),
                         AccessRequest__504144355>;
+      var agendaIdCounter : Nat;
       attendees :
         Map__605269027<(MomentId__514222491, UserId__158757552),
                         Attendee__358347398>;
       grantedAccess :
         Map__605269027<MomentId__514222491, Set__532252804<UserId__158757552>>;
       var idCounter : Nat;
-      moments : Map__605269027<MomentId__514222491, Moment__145803432>
+      moments : Map__605269027<MomentId__514222491, Moment__145803432>;
+      waitlists :
+        Map__605269027<MomentId__514222491,
+                        List__415060402<UserId__158757552>>
+    };
+  stable notificationsState :
+    {
+      var nextNotificationId : Nat;
+      notifications :
+        Map__605269027<UserId__158757552,
+                        List__415060402<Notification__264708741>>
     };
   stable usersState :
     {
+      bookmarks :
+        Map__605269027<UserId__158757552, Set__532252804<MomentId__514222491>>;
       followers :
         Map__605269027<UserId__158757552, Set__532252804<UserId__158757552>>;
       following :
@@ -173,4 +395,4 @@ actor {
       profiles : Map__605269027<UserId__158757552, UserProfile__277265826>;
       usernameIndex : Map__605269027<Text, UserId__158757552>
     }
-};
+}) ;

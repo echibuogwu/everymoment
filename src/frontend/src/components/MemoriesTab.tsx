@@ -65,6 +65,83 @@ function detectMediaKind(file: File): MemoryMediaKind {
   return MemoryMediaKind.image;
 }
 
+/** Render text with @mention tokens highlighted */
+function MentionText({
+  text,
+  onNavigate,
+}: {
+  text: string;
+  onNavigate: (username: string) => void;
+}) {
+  const parts = text.split(/(@\w+)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (/^@\w+$/.test(part)) {
+          const username = part.slice(1);
+          return (
+            <button
+              // biome-ignore lint/suspicious/noArrayIndexKey: positional render
+              key={i}
+              type="button"
+              onClick={() => onNavigate(username)}
+              className="font-semibold text-accent hover:underline cursor-pointer"
+              data-ocid={`memory.mention.${username}`}
+            >
+              {part}
+            </button>
+          );
+        }
+        // biome-ignore lint/suspicious/noArrayIndexKey: positional render
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+/** @mention picker dropdown */
+function MentionPicker({
+  query,
+  attendees,
+  onSelect,
+}: {
+  query: string;
+  attendees: string[];
+  onSelect: (username: string) => void;
+}) {
+  const lowerQuery = query.toLowerCase();
+  const filtered = attendees
+    .filter(
+      (u) => u.toLowerCase().startsWith(lowerQuery) && lowerQuery.length > 0,
+    )
+    .slice(0, 6);
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div
+      className="absolute bottom-full mb-1 left-0 right-0 z-50 glass-card rounded-xl overflow-hidden shadow-lg"
+      data-ocid="memories.mention_picker"
+    >
+      {filtered.map((u) => (
+        <button
+          key={u}
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault(); // Prevent textarea blur
+            onSelect(u);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-muted/40 transition-colors"
+          data-ocid={`memories.mention_option.${u}`}
+        >
+          <span className="text-accent font-medium">@</span>
+          <span className="text-foreground">{u}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Full-screen media lightbox for memories */
 function MemoryLightbox({
   blob,
@@ -100,7 +177,6 @@ function MemoryLightbox({
       onClick={onClose}
       data-ocid="memory-lightbox"
     >
-      {/* Close button */}
       <button
         type="button"
         onClick={onClose}
@@ -222,7 +298,6 @@ function MemoryMedia({
       </audio>
     );
   }
-  // Image — clickable to open lightbox
   return (
     <>
       <button
@@ -350,7 +425,19 @@ function MemoryBubble({
               : undefined
           }
         >
-          {memory.content && <p>{memory.content}</p>}
+          {memory.content && (
+            <p>
+              <MentionText
+                text={memory.content}
+                onNavigate={(username) =>
+                  navigate({
+                    to: "/profile/$username",
+                    params: { username },
+                  })
+                }
+              />
+            </p>
+          )}
           {memory.mediaBlob && (
             <MemoryMedia
               blob={memory.mediaBlob}
@@ -391,11 +478,37 @@ export function MemoriesTab({ momentId }: MemoriesTabProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [beforeCursor, setBeforeCursor] = useState<bigint | null>(null);
   const [allMemories, setAllMemories] = useState<MemoryWithAuthor[]>([]);
+
+  // Mention state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [attendeeUsernames, setAttendeeUsernames] = useState<string[]>([]);
+
   const hasLoadedOnceRef = useRef(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevScrollHeightRef = useRef<number>(0);
   const beforeCursorRef = useRef<bigint | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionStartRef = useRef<number | null>(null);
+
+  // Fetch attendee usernames for mention picker
+  useQuery({
+    queryKey: ["moment-attendees-usernames", momentId],
+    queryFn: async () => {
+      if (!actor) return [];
+      const attendees = await actor.getMomentAttendees(momentId);
+      // Fetch profile for each attendee to get username — batch using Promise.all
+      const profiles = await Promise.all(
+        attendees.map((a) => actor.getUserProfile(a.userId)),
+      );
+      const usernames = profiles
+        .filter((p): p is NonNullable<typeof p> => p !== null)
+        .map((p) => p.username);
+      setAttendeeUsernames(usernames);
+      return usernames;
+    },
+    enabled: !!actor && !isFetching && isAuthenticated,
+  });
 
   const queryKey = ["memories", momentId, beforeCursor?.toString() ?? "latest"];
 
@@ -477,6 +590,42 @@ export function MemoriesTab({ momentId }: MemoriesTabProps) {
     [],
   );
 
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value;
+      setContent(val);
+
+      // Detect @mention trigger
+      const cursor = e.target.selectionStart ?? val.length;
+      const textBeforeCursor = val.slice(0, cursor);
+      const atMatch = /@(\w*)$/.exec(textBeforeCursor);
+      if (atMatch) {
+        mentionStartRef.current = cursor - atMatch[0].length;
+        setMentionQuery(atMatch[1]);
+      } else {
+        mentionStartRef.current = null;
+        setMentionQuery(null);
+      }
+    },
+    [],
+  );
+
+  const handleMentionSelect = useCallback(
+    (username: string) => {
+      if (mentionStartRef.current === null) return;
+      const before = content.slice(0, mentionStartRef.current);
+      const after = content.slice(
+        textareaRef.current?.selectionStart ?? content.length,
+      );
+      const newContent = `${before}@${username} ${after}`;
+      setContent(newContent);
+      setMentionQuery(null);
+      mentionStartRef.current = null;
+      textareaRef.current?.focus();
+    },
+    [content],
+  );
+
   const postMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Not connected");
@@ -494,6 +643,7 @@ export function MemoriesTab({ momentId }: MemoriesTabProps) {
       setPendingFile(null);
       setPendingBlob(null);
       setPendingKind(null);
+      setMentionQuery(null);
       queryClient.invalidateQueries({ queryKey: ["memories", momentId] });
       hasLoadedOnceRef.current = false;
       beforeCursorRef.current = null;
@@ -576,7 +726,6 @@ export function MemoriesTab({ momentId }: MemoriesTabProps) {
         ref={feedRef}
         className="flex-1 overflow-y-auto py-4 space-y-3 scroll-smooth"
       >
-        {/* Load earlier */}
         {hasMore && (
           <div className="flex justify-center pt-1 pb-2">
             <button
@@ -682,8 +831,17 @@ export function MemoriesTab({ momentId }: MemoriesTabProps) {
           </div>
         )}
 
-        {/* Input row */}
-        <div className="flex items-end gap-2">
+        {/* Input row — with mention picker above */}
+        <div className="relative flex items-end gap-2">
+          {/* Mention picker floating above */}
+          {mentionQuery !== null && (
+            <MentionPicker
+              query={mentionQuery}
+              attendees={attendeeUsernames}
+              onSelect={handleMentionSelect}
+            />
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -708,15 +866,20 @@ export function MemoriesTab({ momentId }: MemoriesTabProps) {
 
           {/* Text input */}
           <Textarea
+            ref={textareaRef}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleTextChange}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Escape" && mentionQuery !== null) {
+                setMentionQuery(null);
+                return;
+              }
+              if (e.key === "Enter" && !e.shiftKey && mentionQuery === null) {
                 e.preventDefault();
                 handleSend();
               }
             }}
-            placeholder="Share a memory…"
+            placeholder="Share a memory… (type @ to mention)"
             rows={1}
             className="flex-1 min-h-[38px] max-h-[120px] resize-none rounded-2xl text-sm font-body px-3.5 py-2 focus-visible:ring-1 focus-visible:ring-accent/50 glass-input border-transparent transition-smooth"
             data-ocid="memories-content-input"
@@ -748,7 +911,8 @@ export function MemoriesTab({ momentId }: MemoriesTabProps) {
         </div>
 
         <p className="text-[10px] font-body text-muted-foreground/60 px-1">
-          Images, videos &amp; audio · Max {MAX_FILE_SIZE_MB} MB
+          Images, videos &amp; audio · Max {MAX_FILE_SIZE_MB} MB · Type @ to
+          mention
         </p>
       </div>
     </div>

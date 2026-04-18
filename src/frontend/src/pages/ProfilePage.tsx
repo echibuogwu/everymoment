@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  Bookmark,
   Calendar,
   Check,
   Edit2,
@@ -20,18 +22,25 @@ import {
   X,
 } from "lucide-react";
 import { motion, useScroll, useTransform } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ExternalBlob } from "../backend";
 import { AuthGuard } from "../components/AuthGuard";
 import { EmptyState } from "../components/EmptyState";
 import { Layout } from "../components/Layout";
 import { MomentCard } from "../components/MomentCard";
 import { useAuth } from "../hooks/use-auth";
-import { useBackend } from "../hooks/use-backend";
+import {
+  useBackend,
+  useBookmarkMoment,
+  useBookmarks,
+  useIsBookmarked,
+  useUnbookmarkMoment,
+} from "../hooks/use-backend";
 import { useRequireAuth } from "../hooks/use-require-auth";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { showError, showSuccess } from "../lib/toast";
 import type {
+  MomentId,
   MomentListItem,
   PaymentDetail,
   SaveProfileInput,
@@ -59,6 +68,8 @@ interface EditState {
   paymentDetails: PaymentEntry[];
   photoFile: File | null;
   photoPreview: string | null;
+  hideAttendingList: boolean;
+  isPrivateProfile: boolean;
 }
 
 function initEditState(user: UserProfilePublic): EditState {
@@ -74,6 +85,8 @@ function initEditState(user: UserProfilePublic): EditState {
       : [],
     photoFile: null,
     photoPreview: null,
+    hideAttendingList: user.hideAttendingList,
+    isPrivateProfile: user.isPrivateProfile,
   };
 }
 
@@ -470,6 +483,60 @@ function EditForm({
         )}
       </div>
 
+      {/* Privacy Settings */}
+      <div
+        className="glass-card rounded-2xl p-4 space-y-4"
+        data-ocid="profile.privacy_settings"
+      >
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Privacy Settings
+        </h3>
+
+        {/* Private profile toggle */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <Label
+              htmlFor="toggle-private-profile"
+              className="text-sm font-medium text-foreground cursor-pointer"
+            >
+              Private profile
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+              When on, only your followers can see your full profile, bio,
+              socials, and moments. Others only see your name and avatar.
+            </p>
+          </div>
+          <Switch
+            id="toggle-private-profile"
+            checked={state.isPrivateProfile}
+            onCheckedChange={(val) => set({ isPrivateProfile: val })}
+            data-ocid="profile.private_profile_toggle"
+          />
+        </div>
+
+        {/* Hide attending list toggle */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <Label
+              htmlFor="toggle-hide-attending"
+              className="text-sm font-medium text-foreground cursor-pointer"
+            >
+              Hide attending list
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+              When on, the moments you're attending won't appear on your public
+              profile page. Your own calendar view is unaffected.
+            </p>
+          </div>
+          <Switch
+            id="toggle-hide-attending"
+            checked={state.hideAttendingList}
+            onCheckedChange={(val) => set({ hideAttendingList: val })}
+            data-ocid="profile.hide_attending_toggle"
+          />
+        </div>
+      </div>
+
       {/* Save / Cancel */}
       <div className="flex gap-3 pt-2">
         <motion.div
@@ -510,6 +577,45 @@ function EditForm({
         </motion.div>
       </div>
     </motion.div>
+  );
+}
+
+// ── Bookmark toggle button (for moment cards in profile) ──────────────────────
+
+function BookmarkButton({
+  momentId,
+  className,
+}: {
+  momentId: MomentId;
+  className?: string;
+}) {
+  const { data: isBookmarked } = useIsBookmarked(momentId);
+  const { mutate: bookmark, isPending: isBookmarking } = useBookmarkMoment();
+  const { mutate: unbookmark, isPending: isUnbookmarking } =
+    useUnbookmarkMoment();
+
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isBookmarked) {
+      unbookmark(momentId);
+    } else {
+      bookmark(momentId);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={isBookmarking || isUnbookmarking}
+      className={`p-1.5 rounded-full transition-smooth hover:bg-accent/10 ${className ?? ""}`}
+      aria-label={isBookmarked ? "Remove bookmark" : "Bookmark moment"}
+      data-ocid="moment-card.bookmark_button"
+    >
+      <Bookmark
+        className={`w-4 h-4 ${isBookmarked ? "fill-accent text-accent" : "text-muted-foreground"}`}
+      />
+    </button>
   );
 }
 
@@ -561,7 +667,97 @@ function StatItem({
   );
 }
 
+// ── Saved Tab (own profile only) ──────────────────────────────────────────────
+
+function SavedTab() {
+  const { actor } = useBackend();
+  const { data: bookmarkIds = [], isLoading: isLoadingIds } = useBookmarks();
+  const navigate = useNavigate();
+
+  const { data: moments = [], isLoading: isLoadingMoments } = useQuery<
+    MomentListItem[]
+  >({
+    queryKey: ["savedMomentDetails", bookmarkIds],
+    queryFn: async () => {
+      if (!actor || bookmarkIds.length === 0) return [];
+      const results = await Promise.allSettled(
+        bookmarkIds.map((id) => actor.getMomentDetail(id)),
+      );
+      return results
+        .filter(
+          (
+            r,
+          ): r is PromiseFulfilledResult<
+            Awaited<ReturnType<typeof actor.getMomentDetail>>
+          > => r.status === "fulfilled" && r.value !== null,
+        )
+        .map((r) => r.value as unknown as MomentListItem);
+    },
+    enabled: !!actor && bookmarkIds.length > 0,
+  });
+
+  const isLoading = isLoadingIds || isLoadingMoments;
+
+  if (isLoading) {
+    return (
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+        data-ocid="profile.saved.loading_state"
+      >
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="w-full h-52 rounded-2xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (moments.length === 0) {
+    return (
+      <div
+        className="glass-card rounded-2xl p-8 flex flex-col items-center"
+        data-ocid="profile.saved.empty_state"
+      >
+        <EmptyState
+          icon={Bookmark}
+          title="No saved moments yet"
+          description="Bookmark moments to find them here later."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+      data-ocid="profile.saved.list"
+    >
+      {moments.map((moment, index) => (
+        <div
+          key={moment.id.toString()}
+          className="relative"
+          data-ocid={`profile.saved.item.${index + 1}`}
+        >
+          <MomentCard
+            moment={moment}
+            onClick={() =>
+              navigate({
+                to: "/moments/$momentId",
+                params: { momentId: moment.id.toString() },
+              })
+            }
+          />
+          <div className="absolute top-2 left-2 z-20">
+            <BookmarkButton momentId={moment.id} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
+
+type ProfileTab = "moments" | "saved";
 
 export function ProfilePage() {
   const { username } = useParams({ from: "/profile/$username" });
@@ -573,6 +769,7 @@ export function ProfilePage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editState, setEditState] = useState<EditState | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("moments");
 
   // Parallax for hero banner
   const heroRef = useRef<HTMLDivElement>(null);
@@ -656,6 +853,8 @@ export function ProfilePage() {
               new Uint8Array(await state.photoFile.arrayBuffer()),
             )
           : undefined,
+        hideAttendingList: state.hideAttendingList ?? false,
+        isPrivateProfile: state.isPrivateProfile ?? false,
       };
       await actor.saveCallerUserProfile(input);
     },
@@ -817,7 +1016,7 @@ export function ProfilePage() {
                 )}
               </motion.div>
 
-              {/* ── Stats Row ── */}
+              {/* ── Stats Row: Hosted | Attended | Following | Followers ── */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -826,18 +1025,23 @@ export function ProfilePage() {
               >
                 <div className="glass-card rounded-2xl px-4 py-3 flex items-center">
                   <StatItem
-                    value={momentsQuery.data?.length ?? 0}
-                    label="Moments"
+                    value={user.hostedCount.toString()}
+                    label="Hosted"
                   />
                   <div className="w-px h-8 bg-border/50 self-center" />
                   <StatItem
-                    value={user.followersCount.toString()}
-                    label="Followers"
+                    value={user.attendedCount.toString()}
+                    label="Attended"
                   />
                   <div className="w-px h-8 bg-border/50 self-center" />
                   <StatItem
                     value={user.followingCount.toString()}
                     label="Following"
+                  />
+                  <div className="w-px h-8 bg-border/50 self-center" />
+                  <StatItem
+                    value={user.followersCount.toString()}
+                    label="Followers"
                   />
                 </div>
               </motion.div>
@@ -947,61 +1151,109 @@ export function ProfilePage() {
                 </>
               )}
 
-              {/* Moments grid */}
+              {/* ── Tabs: Moments / Saved (own profile only) ── */}
               {!isEditing && (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.44, duration: 0.35 }}
                 >
-                  <h2 className="text-gradient-accent font-display font-bold text-xl mb-4">
-                    Moments
-                  </h2>
-                  {momentsQuery.isLoading ? (
-                    <div className="space-y-4">
-                      {[1, 2].map((i) => (
-                        <Skeleton key={i} className="w-full h-52 rounded-2xl" />
-                      ))}
-                    </div>
-                  ) : momentsQuery.data?.length === 0 ? (
+                  {/* Tab switcher */}
+                  {isOwnProfile && (
                     <div
-                      className="glass-card rounded-2xl p-8 flex flex-col items-center"
-                      data-ocid="profile.moments_empty_state"
+                      className="flex gap-1 glass-card rounded-2xl p-1 mb-5"
+                      data-ocid="profile.tabs"
                     >
-                      <EmptyState
-                        icon={Calendar}
-                        title="No moments yet"
-                        description="This user hasn't created any moments."
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {momentsQuery.data?.map((moment, index) => (
-                        <motion.div
-                          key={moment.id.toString()}
-                          initial={{ opacity: 0, y: 16 }}
-                          whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true }}
-                          transition={{
-                            delay: index * 0.08,
-                            duration: 0.35,
-                            ease: [0.34, 1.2, 0.64, 1],
-                          }}
-                          data-ocid={`profile.moment.item.${index + 1}`}
-                        >
-                          <MomentCard
-                            moment={moment}
-                            onClick={() =>
-                              navigate({
-                                to: "/moments/$momentId",
-                                params: { momentId: moment.id.toString() },
-                              })
-                            }
-                          />
-                        </motion.div>
-                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("moments")}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-sm font-medium transition-smooth ${
+                          activeTab === "moments"
+                            ? "bg-accent text-accent-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        data-ocid="profile.moments_tab"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        Moments
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("saved")}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-sm font-medium transition-smooth ${
+                          activeTab === "saved"
+                            ? "bg-accent text-accent-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        data-ocid="profile.saved_tab"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                        Saved
+                      </button>
                     </div>
                   )}
+
+                  {/* Tab: Moments */}
+                  {activeTab === "moments" && (
+                    <>
+                      {!isOwnProfile && (
+                        <h2 className="text-gradient-accent font-display font-bold text-xl mb-4">
+                          Moments
+                        </h2>
+                      )}
+                      {momentsQuery.isLoading ? (
+                        <div className="space-y-4">
+                          {[1, 2].map((i) => (
+                            <Skeleton
+                              key={i}
+                              className="w-full h-52 rounded-2xl"
+                            />
+                          ))}
+                        </div>
+                      ) : momentsQuery.data?.length === 0 ? (
+                        <div
+                          className="glass-card rounded-2xl p-8 flex flex-col items-center"
+                          data-ocid="profile.moments_empty_state"
+                        >
+                          <EmptyState
+                            icon={Calendar}
+                            title="No moments yet"
+                            description="This user hasn't created any moments."
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {momentsQuery.data?.map((moment, index) => (
+                            <div
+                              key={moment.id.toString()}
+                              className="relative"
+                              data-ocid={`profile.moment.item.${index + 1}`}
+                            >
+                              <MomentCard
+                                moment={moment}
+                                onClick={() =>
+                                  navigate({
+                                    to: "/moments/$momentId",
+                                    params: {
+                                      momentId: moment.id.toString(),
+                                    },
+                                  })
+                                }
+                              />
+                              {isAuthenticated && (
+                                <div className="absolute top-2 left-2 z-20">
+                                  <BookmarkButton momentId={moment.id} />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Tab: Saved (own profile only) */}
+                  {activeTab === "saved" && isOwnProfile && <SavedTab />}
                 </motion.div>
               )}
             </div>

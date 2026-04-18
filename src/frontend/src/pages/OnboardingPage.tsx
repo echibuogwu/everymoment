@@ -120,7 +120,12 @@ export function OnboardingPage() {
         const bytes = new Uint8Array(await photoFile.arrayBuffer());
         photo = ExternalBlob.fromBytes(bytes);
       }
-      await actor.saveCallerUserProfile({ username, photo });
+      await actor.saveCallerUserProfile({
+        username,
+        photo,
+        hideAttendingList: false,
+        isPrivateProfile: false,
+      });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({

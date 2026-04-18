@@ -29,6 +29,9 @@ export const QUERY_KEYS = {
   // Attendees
   momentAttendees: (momentId: string) => ["momentAttendees", momentId] as const,
 
+  // Waitlist
+  momentWaitlist: (momentId: string) => ["momentWaitlist", momentId] as const,
+
   // Folders
   folders: (momentId: string) => ["folders", momentId] as const,
 
@@ -42,6 +45,25 @@ export const QUERY_KEYS = {
 
   // Comments
   comments: (mediaId: string) => ["comments", mediaId] as const,
+
+  // Announcements
+  announcements: (momentId: string) => ["announcements", momentId] as const,
+
+  // Notifications
+  notifications: ["notifications"] as const,
+  unreadNotificationCount: ["unreadNotificationCount"] as const,
+
+  // Messages
+  conversations: ["conversations"] as const,
+  conversation: (userId: string) => ["conversation", userId] as const,
+  unreadMessageCount: ["unreadMessageCount"] as const,
+
+  // Bookmarks
+  bookmarks: ["bookmarks"] as const,
+  isBookmarked: (momentId: string) => ["isBookmarked", momentId] as const,
+
+  // Activity feed
+  activityFeed: ["activityFeed"] as const,
 
   // Admin
   adminUsers: ["adminUsers"] as const,

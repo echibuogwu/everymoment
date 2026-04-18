@@ -18,7 +18,13 @@ export interface CreateMomentInput {
     locationLat?: number;
     locationLng?: number;
     title: string;
+    maxAttendees?: bigint;
     tags: Array<string>;
+    agendaItems: Array<{
+        title: string;
+        time: string;
+        description?: string;
+    }>;
     description: string;
     recurrence?: RecurrenceRule;
     coverImage?: ExternalBlob;
@@ -51,6 +57,7 @@ export interface MomentListItem {
     title: string;
     attendeeCount: bigint;
     owner: UserId;
+    maxAttendees?: bigint;
     createdAt: Timestamp;
     tags: Array<string>;
     description: string;
@@ -58,9 +65,18 @@ export interface MomentListItem {
     coverImage?: ExternalBlob;
     occurrenceDate?: Timestamp;
     callerRelation?: CallerRelation;
+    waitlistCount: bigint;
     visibility: Visibility;
     location: string;
     eventDate: Timestamp;
+}
+export interface ActivityEvent {
+    id: bigint;
+    kind: ActivityKind;
+    createdAt: Timestamp;
+    momentId?: MomentId;
+    actorId: UserId;
+    targetUserId?: UserId;
 }
 export interface Folder {
     id: FolderId;
@@ -75,6 +91,10 @@ export interface MediaPage {
     nextOffset?: bigint;
     items: Array<Media>;
 }
+export interface PaymentDetail {
+    value: string;
+    name: string;
+}
 export interface Media {
     id: MediaId;
     likeCount: bigint;
@@ -86,15 +106,22 @@ export interface Media {
     folderId: FolderId;
     uploadedBy: UserId;
 }
-export interface PaymentDetail {
-    value: string;
-    name: string;
+export interface ConversationSummary {
+    userId: UserId;
+    lastMessage: Message;
+    unreadCount: bigint;
 }
 export interface UpdateMomentInput {
     locationLat?: number;
     locationLng?: number;
     title: string;
+    maxAttendees?: bigint;
     tags: Array<string>;
+    agendaItems: Array<{
+        title: string;
+        time: string;
+        description?: string;
+    }>;
     description: string;
     recurrence?: RecurrenceRule;
     coverImage?: ExternalBlob;
@@ -104,9 +131,11 @@ export interface UpdateMomentInput {
 }
 export interface SaveProfileInput {
     username: string;
+    hideAttendingList: boolean;
     name?: string;
     socials?: Array<SocialLink>;
     paymentDetails?: Array<PaymentDetail>;
+    isPrivateProfile: boolean;
     photo?: ExternalBlob;
     location?: string;
 }
@@ -116,11 +145,6 @@ export interface Comment {
     createdAt: Timestamp;
     text: string;
     author: UserId;
-    parentId?: CommentId;
-    mediaId: MediaId;
-}
-export interface AddCommentInput {
-    text: string;
     parentId?: CommentId;
     mediaId: MediaId;
 }
@@ -167,17 +191,39 @@ export interface CreateFolderInput {
     name: string;
     momentId: MomentId;
 }
+export interface AgendaItem {
+    id: bigint;
+    title: string;
+    time: string;
+    description?: string;
+}
 export interface UserProfilePublic {
     id: UserId;
     username: string;
+    hideAttendingList: boolean;
     followersCount: bigint;
     name?: string;
     createdAt: Timestamp;
     socials?: Array<SocialLink>;
     paymentDetails?: Array<PaymentDetail>;
+    isPrivateProfile: boolean;
+    hostedCount: bigint;
+    attendedCount: bigint;
     followingCount: bigint;
     photo?: ExternalBlob;
     location?: string;
+}
+export interface AddCommentInput {
+    text: string;
+    parentId?: CommentId;
+    mediaId: MediaId;
+}
+export interface Announcement {
+    id: bigint;
+    authorId: UserId;
+    createdAt: Timestamp;
+    text: string;
+    momentId: MomentId;
 }
 export type UserId = Principal;
 export interface UploadMediaInput {
@@ -201,16 +247,28 @@ export interface MomentDetail {
     attendeeCount: bigint;
     callerAccessStatus?: AccessStatus;
     owner: UserId;
+    maxAttendees?: bigint;
     createdAt: Timestamp;
     tags: Array<string>;
+    agendaItems: Array<AgendaItem>;
     description: string;
     recurrence?: RecurrenceRule;
     coverImage?: ExternalBlob;
     updatedAt: Timestamp;
+    waitlistCount: bigint;
     visibility: Visibility;
     isOwner: boolean;
     location: string;
     eventDate: Timestamp;
+}
+export interface Notification {
+    id: bigint;
+    kind: NotificationKind;
+    createdAt: Timestamp;
+    referenceId?: string;
+    isRead: boolean;
+    message: string;
+    recipientId: UserId;
 }
 export type RecurrenceEndCondition = {
     __kind__: "endDate";
@@ -222,6 +280,14 @@ export type RecurrenceEndCondition = {
     __kind__: "never";
     never: null;
 };
+export interface Message {
+    id: bigint;
+    createdAt: Timestamp;
+    text: string;
+    isRead: boolean;
+    recipientId: UserId;
+    senderId: UserId;
+}
 export interface BulkImportMomentRow {
     locationLat?: number;
     locationLng?: number;
@@ -244,6 +310,11 @@ export enum AccessStatus {
     denied = "denied",
     approved = "approved"
 }
+export enum ActivityKind {
+    rsvpdToMoment = "rsvpdToMoment",
+    createdMoment = "createdMoment",
+    followedUser = "followedUser"
+}
 export enum MediaKind {
     audio = "audio",
     video = "video",
@@ -254,6 +325,14 @@ export enum MemoryMediaKind {
     audio = "audio",
     video = "video",
     image = "image"
+}
+export enum NotificationKind {
+    accessRequestResolved = "accessRequestResolved",
+    rsvpToYourMoment = "rsvpToYourMoment",
+    mentioned = "mentioned",
+    newAnnouncement = "newAnnouncement",
+    newFollower = "newFollower",
+    newMessage = "newMessage"
 }
 export enum RecurrenceFrequency {
     monthly = "monthly",
@@ -286,8 +365,10 @@ export interface backendInterface {
     adminListMoments(): Promise<Array<MomentListItem>>;
     adminListUsers(): Promise<Array<UserProfilePublic>>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    bookmarkMoment(momentId: MomentId): Promise<void>;
     createFolder(input: CreateFolderInput): Promise<FolderId>;
     createMoment(input: CreateMomentInput): Promise<MomentId>;
+    deleteAnnouncement(momentId: MomentId, announcementId: bigint): Promise<void>;
     deleteComment(commentId: CommentId): Promise<void>;
     deleteFolder(folderId: FolderId): Promise<void>;
     deleteMedia(mediaId: MediaId): Promise<void>;
@@ -300,8 +381,11 @@ export interface backendInterface {
     }>;
     deleteMoment(momentId: MomentId): Promise<void>;
     followUser(target: UserId): Promise<void>;
+    getActivityFeed(): Promise<Array<ActivityEvent>>;
+    getAnnouncementsForMoment(momentId: MomentId): Promise<Array<Announcement>>;
     getCallerUserProfile(): Promise<UserProfilePublic | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getConversation(otherUserId: UserId): Promise<Array<Message>>;
     getEventPassInfo(momentId: MomentId, userId: UserId): Promise<{
         __kind__: "ok";
         ok: AttendanceInfo;
@@ -326,13 +410,20 @@ export interface backendInterface {
     getMomentPublicUrl(momentId: MomentId): Promise<string>;
     getMomentQrCode(momentId: MomentId): Promise<string>;
     getMomentShareUrl(momentId: MomentId): Promise<string>;
+    getMomentWaitlist(momentId: MomentId): Promise<Array<UserId>>;
     getMomentsForUser(userId: UserId): Promise<Array<MomentListItem>>;
     getMyAttendanceInfo(momentId: MomentId): Promise<AttendanceInfo | null>;
+    getMyBookmarks(): Promise<Array<MomentId>>;
     getMyCalendarMoments(rangeStart: Timestamp, rangeEnd: Timestamp): Promise<Array<MomentListItem>>;
+    getMyConversations(): Promise<Array<ConversationSummary>>;
     getMyMoments(): Promise<Array<MomentListItem>>;
+    getMyNotifications(): Promise<Array<Notification>>;
+    getUnreadMessageCount(): Promise<bigint>;
+    getUnreadNotificationCount(): Promise<bigint>;
     getUserProfile(userId: UserId): Promise<UserProfilePublic | null>;
     getUserProfileByUsername(username: string): Promise<UserProfilePublic | null>;
     hasLikedMedia(mediaId: MediaId): Promise<boolean>;
+    isBookmarked(momentId: MomentId): Promise<boolean>;
     isCallerAdmin(): Promise<boolean>;
     isFollowingUser(target: UserId): Promise<boolean>;
     isUsernameTaken(username: string): Promise<boolean>;
@@ -341,6 +432,10 @@ export interface backendInterface {
     listMedia(momentId: MomentId, offset: bigint, limit: bigint): Promise<MediaPage>;
     listMediaByFolder(folderId: FolderId, offset: bigint, limit: bigint): Promise<MediaPage>;
     listMomentAccessRequests(momentId: MomentId): Promise<Array<AccessRequest>>;
+    markAllNotificationsRead(): Promise<void>;
+    markConversationRead(otherUserId: UserId): Promise<void>;
+    markNotificationRead(id: bigint): Promise<void>;
+    postAnnouncement(momentId: MomentId, text: string): Promise<Announcement>;
     postMemory(momentId: MomentId, content: string, mediaBlob: ExternalBlob | null, mediaKind: MemoryMediaKind | null): Promise<{
         __kind__: "ok";
         ok: MemoryId;
@@ -359,8 +454,10 @@ export interface backendInterface {
     revokeMomentAccess(momentId: MomentId, userId: UserId): Promise<void>;
     saveCallerUserProfile(input: SaveProfileInput): Promise<void>;
     searchMoments(searchText: string | null, tags: Array<string>, dateRangeStart: Timestamp | null, dateRangeEnd: Timestamp | null, locationLat: number | null, locationLng: number | null, radiusKm: number | null, offset: bigint, limit: bigint): Promise<Array<MomentListItem>>;
+    sendMessage(recipientId: UserId, text: string): Promise<bigint>;
     setRsvp(momentId: MomentId, status: RsvpStatus): Promise<void>;
     toggleLike(mediaId: MediaId): Promise<bigint>;
+    unbookmarkMoment(momentId: MomentId): Promise<void>;
     unfollowUser(target: UserId): Promise<void>;
     updateMoment(momentId: MomentId, input: UpdateMomentInput): Promise<void>;
     uploadMedia(input: UploadMediaInput): Promise<MediaId>;

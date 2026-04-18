@@ -18,8 +18,12 @@ module {
     accessRequests : Map.Map<(Common.MomentId, Common.UserId), T.AccessRequest>;
     attendees : Map.Map<(Common.MomentId, Common.UserId), T.Attendee>;
     grantedAccess : Map.Map<Common.MomentId, Set.Set<Common.UserId>>;
+    // Waitlist per moment (ordered list of userIds waiting for capacity)
+    waitlists : Map.Map<Common.MomentId, List.List<Common.UserId>>;
     // Counter used as part of UUID generation to ensure uniqueness within same nanosecond
     var idCounter : Nat;
+    // Counter for auto-assigning agenda item IDs
+    var agendaIdCounter : Nat;
   };
 
   func _pairCompare(a : (Common.MomentId, Common.UserId), b : (Common.MomentId, Common.UserId)) : { #less; #equal; #greater } {
@@ -37,7 +41,9 @@ module {
       accessRequests = Map.empty<(Common.MomentId, Common.UserId), T.AccessRequest>();
       attendees = Map.empty<(Common.MomentId, Common.UserId), T.Attendee>();
       grantedAccess = Map.empty<Common.MomentId, Set.Set<Common.UserId>>();
+      waitlists = Map.empty<Common.MomentId, List.List<Common.UserId>>();
       var idCounter = 0;
+      var agendaIdCounter = 0;
     };
   };
 
@@ -100,6 +106,14 @@ module {
     count;
   };
 
+  // ── Helper: count waitlist entries for a moment ────────────────────────────
+  func _waitlistCount(state : MomentsState, momentId : Common.MomentId) : Nat {
+    switch (state.waitlists.get(momentId)) {
+      case (?wl) wl.size();
+      case null 0;
+    };
+  };
+
   // ── Helper: convert Moment to MomentListItem ──────────────────────────────
   func _toListItem(state : MomentsState, m : T.Moment, callerRelation : ?T.CallerRelation, occurrenceDate : ?Common.Timestamp) : T.MomentListItem {
     {
@@ -119,6 +133,8 @@ module {
       callerRelation = callerRelation;
       occurrenceDate = occurrenceDate;
       recurrence = m.recurrence;
+      maxAttendees = m.maxAttendees;
+      waitlistCount = _waitlistCount(state, m.id);
     };
   };
 
@@ -208,6 +224,18 @@ module {
   public func createMoment(state : MomentsState, owner : Common.UserId, input : T.CreateMomentInput) : Common.MomentId {
     let id = _generateId(state, owner);
     let now = Time.now();
+
+    // Auto-assign IDs to agenda items
+    let agendaItems = input.agendaItems.mapEntries(func(item : { time : Text; title : Text; description : ?Text }, idx : Nat) : T.AgendaItem {
+      {
+        id = state.agendaIdCounter + idx;
+        time = item.time;
+        title = item.title;
+        description = item.description;
+      }
+    });
+    state.agendaIdCounter += input.agendaItems.size();
+
     let moment : T.Moment = {
       id;
       owner;
@@ -223,6 +251,8 @@ module {
       createdAt = now;
       updatedAt = now;
       recurrence = input.recurrence;
+      maxAttendees = input.maxAttendees;
+      agendaItems;
     };
     state.moments.add(id, moment);
 
@@ -256,6 +286,18 @@ module {
         if (not Principal.equal(existing.owner, caller)) {
           Runtime.trap("Unauthorized: only owner can update");
         };
+
+        // Re-assign IDs to agenda items
+        let agendaItems = input.agendaItems.mapEntries(func(item : { time : Text; title : Text; description : ?Text }, idx : Nat) : T.AgendaItem {
+          {
+            id = state.agendaIdCounter + idx;
+            time = item.time;
+            title = item.title;
+            description = item.description;
+          }
+        });
+        state.agendaIdCounter += input.agendaItems.size();
+
         let updated : T.Moment = {
           existing with
           title = input.title;
@@ -269,6 +311,8 @@ module {
           visibility = input.visibility;
           updatedAt = Time.now();
           recurrence = input.recurrence;
+          maxAttendees = input.maxAttendees;
+          agendaItems;
         };
         state.moments.add(momentId, updated);
       };
@@ -636,6 +680,9 @@ module {
           callerAccessStatus = callerAccessStatus;
           isOwner = isOwner;
           recurrence = m.recurrence;
+          maxAttendees = m.maxAttendees;
+          waitlistCount = _waitlistCount(state, momentId);
+          agendaItems = m.agendaItems;
         };
       };
     };
@@ -841,6 +888,11 @@ module {
     results.toArray();
   };
 
+  // Returns the ordered waitlist for a moment (userId array, first = next to be promoted)
+  public func getMomentWaitlist(state : MomentsState, momentId : Common.MomentId) : [Common.UserId] {
+    Runtime.trap("not implemented");
+  };
+
   public func getAttendanceInfo(state : MomentsState, usersState : UsersLib.UsersState, userId : Common.UserId, momentId : Common.MomentId) : ?T.AttendanceInfo {
     switch (state.moments.get(momentId)) {
       case null null;
@@ -925,6 +977,8 @@ module {
           coverImage = coverImageBlob;
           visibility;
           recurrence = null;
+          maxAttendees = row.maxAttendees;
+          agendaItems = [];
         };
 
         ignore createMoment(state, owner, input);

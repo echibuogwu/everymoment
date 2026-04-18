@@ -2,27 +2,35 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createActorWithConfig } from "@caffeineai/core-infrastructure";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
+  AlarmClock,
   ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
   Calendar,
+  CalendarPlus,
   Check,
   ChevronDown,
   ChevronUp,
   Clock,
   Copy,
+  ExternalLink,
   Globe,
   Images,
   Lock,
   MapPin,
+  Megaphone,
   MessageSquareHeart,
   Pencil,
   QrCode,
   Share2,
   ShieldCheck,
   Ticket,
+  Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
@@ -40,10 +48,26 @@ import { MomentMediaTab } from "../components/MomentMediaTab";
 import { PrivateMomentPreview } from "../components/PrivateMomentPreview";
 import { RsvpButton } from "../components/RsvpButton";
 import { useAuth } from "../hooks/use-auth";
-import { useBackend } from "../hooks/use-backend";
+import {
+  useAnnouncements,
+  useBackend,
+  useBookmarkMoment,
+  useDeleteAnnouncement,
+  useIsBookmarked,
+  usePostAnnouncement,
+  useUnbookmarkMoment,
+} from "../hooks/use-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
+import { showError, showSuccess } from "../lib/toast";
 import { AccessStatus, RsvpStatus } from "../types";
-import type { Attendee, MomentDetail } from "../types";
+import type {
+  AgendaItem,
+  Announcement,
+  Attendee,
+  MomentDetail,
+} from "../types";
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDate(ts: bigint): string {
   return new Date(Number(ts / 1_000_000n)).toLocaleDateString("en-US", {
@@ -61,6 +85,20 @@ function formatTime(ts: bigint): string {
   });
 }
 
+function formatRelativeTime(ts: bigint): string {
+  const ms = Number(ts / 1_000_000n);
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+// ── Skeleton ───────────────────────────────────────────────────────────────────
+
 function MomentDetailSkeleton() {
   return (
     <div className="space-y-0">
@@ -75,8 +113,430 @@ function MomentDetailSkeleton() {
   );
 }
 
-/** Inline share section — glass surface with copy-link + collapsible QR */
-function ShareSection({ momentId }: { momentId: string }) {
+// ── Announcements ─────────────────────────────────────────────────────────────
+
+interface AnnouncementsSectionProps {
+  momentId: string;
+  isOwner: boolean;
+}
+
+function AnnouncementsSection({
+  momentId,
+  isOwner,
+}: AnnouncementsSectionProps) {
+  const { data: announcements, isLoading } = useAnnouncements(momentId);
+  const postMutation = usePostAnnouncement();
+  const deleteMutation = useDeleteAnnouncement();
+  const [text, setText] = useState("");
+  const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+
+  const handlePost = () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    postMutation.mutate(
+      { momentId, text: trimmed },
+      {
+        onSuccess: () => {
+          setText("");
+          showSuccess("Announcement posted");
+        },
+        onError: () => showError("Failed to post announcement"),
+      },
+    );
+  };
+
+  const handleDelete = (ann: Announcement) => {
+    deleteMutation.mutate(
+      { momentId, announcementId: ann.id },
+      {
+        onSuccess: () => showSuccess("Announcement removed"),
+        onError: () => showError("Failed to delete announcement"),
+      },
+    );
+  };
+
+  const visible = announcements?.filter((a) => !dismissed.has(Number(a.id)));
+
+  if (isLoading) return null;
+  if (!isOwner && (!visible || visible.length === 0)) return null;
+
+  return (
+    <div className="space-y-3" data-ocid="announcements-section">
+      {/* Compose — owner only */}
+      {isOwner && (
+        <div className="glass-card rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Megaphone className="w-4 h-4 text-accent" />
+            <p className="text-sm font-body font-semibold text-foreground">
+              Post Announcement
+            </p>
+          </div>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Announce a change, reminder, or update…"
+            rows={2}
+            className="w-full px-4 py-3 rounded-xl font-body text-sm glass-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-all duration-200 resize-none"
+            data-ocid="announcement-textarea"
+          />
+          <Button
+            size="sm"
+            onClick={handlePost}
+            disabled={!text.trim() || postMutation.isPending}
+            className="w-full"
+            data-ocid="announcement-post-button"
+          >
+            {postMutation.isPending ? "Posting…" : "Post Announcement"}
+          </Button>
+        </div>
+      )}
+
+      {/* Announcement banners */}
+      {visible && visible.length > 0 && (
+        <div className="space-y-2">
+          {visible.map((ann) => (
+            <div
+              key={Number(ann.id)}
+              className="glass-card rounded-2xl px-4 py-3 border border-accent/20 bg-accent/5"
+              data-ocid="announcement-item"
+            >
+              <div className="flex items-start gap-3">
+                <Megaphone className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <p className="text-sm font-body text-foreground leading-relaxed">
+                    {ann.text}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-body">
+                    {formatRelativeTime(ann.createdAt)}
+                  </p>
+                </div>
+                {isOwner ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(ann)}
+                    className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                    aria-label="Delete announcement"
+                    data-ocid="announcement-delete-button"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDismissed((prev) => new Set([...prev, Number(ann.id)]))
+                    }
+                    className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"
+                    aria-label="Dismiss"
+                    data-ocid="announcement-dismiss-button"
+                  >
+                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Capacity Indicator ─────────────────────────────────────────────────────────
+
+interface CapacityIndicatorProps {
+  attendeeCount: bigint;
+  maxAttendees?: bigint;
+  waitlistCount: bigint;
+}
+
+function CapacityIndicator({
+  attendeeCount,
+  maxAttendees,
+  waitlistCount,
+}: CapacityIndicatorProps) {
+  if (!maxAttendees) return null;
+
+  const total = Number(maxAttendees);
+  const attending = Number(attendeeCount);
+  const waitlisted = Number(waitlistCount);
+  const remaining = Math.max(0, total - attending);
+  const isFull = attending >= total;
+  const pct = Math.min(100, (attending / total) * 100);
+
+  return (
+    <div
+      className="glass-card rounded-xl px-3 py-2.5 space-y-1.5"
+      data-ocid="capacity-indicator"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-body text-muted-foreground flex items-center gap-1.5">
+          <Ticket className="w-3.5 h-3.5" />
+          Capacity
+        </span>
+        {isFull ? (
+          <Badge
+            variant="destructive"
+            className="text-xs"
+            data-ocid="capacity-full-badge"
+          >
+            {waitlisted > 0 ? `Full · ${waitlisted} on waitlist` : "Full"}
+          </Badge>
+        ) : (
+          <span
+            className="text-xs font-body font-semibold text-green-500"
+            data-ocid="capacity-spots-badge"
+          >
+            {remaining} spot{remaining !== 1 ? "s" : ""} left
+          </span>
+        )}
+      </div>
+      {/* Progress bar */}
+      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            isFull
+              ? "bg-destructive"
+              : pct > 75
+                ? "bg-yellow-500"
+                : "bg-green-500"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground font-body">
+        {attending} of {total} attending
+      </p>
+    </div>
+  );
+}
+
+// ── Bookmark Button ────────────────────────────────────────────────────────────
+
+function BookmarkButton({ momentId }: { momentId: string }) {
+  const { isAuthenticated } = useAuth();
+  const { data: isBookmarked } = useIsBookmarked(
+    isAuthenticated ? momentId : null,
+  );
+  const bookmarkMutation = useBookmarkMoment();
+  const unbookmarkMutation = useUnbookmarkMoment();
+
+  if (!isAuthenticated) return null;
+
+  const handleToggle = () => {
+    if (isBookmarked) {
+      unbookmarkMutation.mutate(momentId, {
+        onSuccess: () => showSuccess("Bookmark removed"),
+        onError: () => showError("Failed to update bookmark"),
+      });
+    } else {
+      bookmarkMutation.mutate(momentId, {
+        onSuccess: () => showSuccess("Moment saved"),
+        onError: () => showError("Failed to update bookmark"),
+      });
+    }
+  };
+
+  const isPending = bookmarkMutation.isPending || unbookmarkMutation.isPending;
+
+  return (
+    <button
+      type="button"
+      onClick={handleToggle}
+      disabled={isPending}
+      aria-label={isBookmarked ? "Remove bookmark" : "Bookmark moment"}
+      className="w-9 h-9 rounded-xl glass-card flex items-center justify-center transition-smooth button-spring disabled:opacity-50"
+      data-ocid="bookmark-toggle-button"
+    >
+      {isBookmarked ? (
+        <BookmarkCheck className="w-4 h-4 text-accent" />
+      ) : (
+        <Bookmark className="w-4 h-4 text-muted-foreground" />
+      )}
+    </button>
+  );
+}
+
+// ── Add to Calendar ────────────────────────────────────────────────────────────
+
+function generateIcs(moment: MomentDetail): string {
+  const start = new Date(Number(moment.eventDate / 1_000_000n));
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // +2h default
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//EveryMoment//EN",
+    "BEGIN:VEVENT",
+    `UID:${moment.id}@everymoment`,
+    `DTSTAMP:${fmt(new Date())}`, // eslint-disable-line
+    `DTSTART:${fmt(start)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:${moment.title.replace(/\n/g, " ")}`,
+    moment.location ? `LOCATION:${moment.location.replace(/\n/g, " ")}` : "",
+    moment.description
+      ? `DESCRIPTION:${moment.description.replace(/\n/g, "\\n")}`
+      : "",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ]
+    .filter(Boolean)
+    .join("\r\n");
+
+  return lines;
+}
+
+function googleCalendarUrl(moment: MomentDetail): string {
+  const start = new Date(Number(moment.eventDate / 1_000_000n));
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00Z`;
+
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: moment.title,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: moment.description ?? "",
+    location: moment.location ?? "",
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function downloadIcs(moment: MomentDetail) {
+  const ics = generateIcs(moment);
+  const blob = new Blob([ics], { type: "text/calendar" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${moment.title.replace(/[^a-z0-9]/gi, "_")}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function AddToCalendarButton({ moment }: { moment: MomentDetail }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative" data-ocid="add-to-calendar-section">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl glass-card border border-border text-sm font-body font-medium text-foreground hover:bg-accent/5 transition-smooth"
+        data-ocid="add-to-calendar-button"
+      >
+        <CalendarPlus className="w-4 h-4 text-accent" />
+        Add to Calendar
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 right-0 mt-2 glass-card rounded-xl border border-border shadow-lg overflow-hidden z-30"
+            data-ocid="add-to-calendar-dropdown"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                window.open(googleCalendarUrl(moment), "_blank");
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-body text-foreground hover:bg-accent/10 transition-colors"
+              data-ocid="calendar-google-button"
+            >
+              <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              Google Calendar
+            </button>
+            <div className="border-t border-border" />
+            <button
+              type="button"
+              onClick={() => {
+                downloadIcs(moment);
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-body text-foreground hover:bg-accent/10 transition-colors"
+              data-ocid="calendar-ics-button"
+            >
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              Apple Calendar / Outlook (.ics)
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Agenda / Timeline ──────────────────────────────────────────────────────────
+
+function AgendaTimeline({ items }: { items: AgendaItem[] }) {
+  if (!items.length) return null;
+
+  return (
+    <div className="space-y-3" data-ocid="agenda-section">
+      <div className="flex items-center gap-2">
+        <AlarmClock className="w-4 h-4 text-accent" />
+        <h3 className="font-display font-semibold text-sm text-foreground">
+          Agenda
+        </h3>
+      </div>
+
+      <div className="relative pl-5">
+        {/* Vertical line */}
+        <div className="absolute left-1.5 top-2 bottom-2 w-px bg-border" />
+
+        <div className="space-y-4">
+          {items.map((item, i) => (
+            <div
+              key={Number(item.id)}
+              className="relative"
+              data-ocid={`agenda-item.${i + 1}`}
+            >
+              {/* Dot */}
+              <div className="absolute -left-[14px] top-1 w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-background" />
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-body font-semibold text-accent">
+                    {item.time}
+                  </span>
+                  <span className="text-sm font-body font-medium text-foreground">
+                    {item.title}
+                  </span>
+                </div>
+                {item.description && (
+                  <p className="text-xs text-muted-foreground font-body leading-relaxed">
+                    {item.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Share Section ──────────────────────────────────────────────────────────────
+
+function ShareSection({
+  momentId,
+  moment,
+}: {
+  momentId: string;
+  moment: MomentDetail;
+}) {
   const [copied, setCopied] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const shareUrl = `${window.location.origin}/moment/${momentId}`;
@@ -96,13 +556,17 @@ function ShareSection({ momentId }: { momentId: string }) {
       className="glass-card rounded-2xl p-4 space-y-3"
       data-ocid="share-section"
     >
-      <div className="flex items-center gap-2">
-        <Share2 className="w-4 h-4 text-muted-foreground" />
-        <h3 className="font-display font-semibold text-sm text-foreground">
-          Share this Moment
-        </h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Share2 className="w-4 h-4 text-muted-foreground" />
+          <h3 className="font-display font-semibold text-sm text-foreground">
+            Share this Moment
+          </h3>
+        </div>
+        <BookmarkButton momentId={momentId} />
       </div>
 
+      {/* Copy link */}
       <Button
         variant="outline"
         size="sm"
@@ -123,6 +587,10 @@ function ShareSection({ momentId }: { momentId: string }) {
         )}
       </Button>
 
+      {/* Add to calendar */}
+      <AddToCalendarButton moment={moment} />
+
+      {/* QR toggle */}
       <div className="space-y-2">
         <button
           type="button"
@@ -169,6 +637,8 @@ function ShareSection({ momentId }: { momentId: string }) {
   );
 }
 
+// ── Tab bar ────────────────────────────────────────────────────────────────────
+
 type TabId = "memories" | "media" | "people" | "access";
 
 interface GlassTabBarProps {
@@ -189,9 +659,6 @@ function GlassTabBar({ tabs, active, onChange }: GlassTabBarProps) {
           type="button"
           onClick={() => onChange(tab.id)}
           className="relative px-4 py-2 rounded-full text-xs font-body font-medium transition-colors z-10 flex items-center gap-1.5"
-          style={{
-            color: active === tab.id ? "oklch(var(--accent))" : undefined,
-          }}
           data-ocid={`moment-tab-${tab.id}`}
           aria-selected={active === tab.id}
         >
@@ -222,7 +689,8 @@ function GlassTabBar({ tabs, active, onChange }: GlassTabBarProps) {
   );
 }
 
-/** Parallax hero image */
+// ── Hero ───────────────────────────────────────────────────────────────────────
+
 function HeroImage({ src, alt }: { src: string; alt: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
@@ -239,7 +707,6 @@ function HeroImage({ src, alt }: { src: string; alt: string }) {
         className="w-full h-[120%] object-cover absolute inset-0"
         style={{ y, willChange: "transform" }}
       />
-      {/* Bottom gradient fade */}
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent pointer-events-none" />
     </div>
   );
@@ -253,6 +720,8 @@ function HeroGradient() {
     </div>
   );
 }
+
+// ── Main Content ───────────────────────────────────────────────────────────────
 
 export function MomentDetailContent({ momentId }: { momentId: string }) {
   const { actor, isFetching } = useBackend();
@@ -310,7 +779,7 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
     navigate({ to: "/explore" });
   };
 
-  // Build tabs in fixed order: Memories first (always), then Media, People, Access
+  // Build tabs in fixed order
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [];
   if (isAttending) {
     tabs.push({
@@ -337,7 +806,6 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
     });
   }
 
-  // Ensure active tab is valid given available tabs
   const validActiveTab =
     tabs.find((t) => t.id === activeTab)?.id ??
     (isAttending ? "memories" : "media");
@@ -378,9 +846,8 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
           </div>
         ) : (
           <div className="pb-10">
-            {/* Hero — full bleed, no side padding */}
+            {/* Hero */}
             <div className="relative -mx-4 md:-mx-6">
-              {/* Floating back button */}
               <button
                 type="button"
                 onClick={handleBack}
@@ -391,7 +858,6 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
                 <ArrowLeft className="w-4 h-4 text-foreground" />
               </button>
 
-              {/* Edit button — floating top right */}
               {moment.isOwner && (
                 <button
                   type="button"
@@ -416,7 +882,7 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
               )}
             </div>
 
-            {/* Glass info card — overlaps hero by 60px */}
+            {/* Glass info card */}
             <motion.div
               initial={{ y: 80, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -489,14 +955,19 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
                   </div>
                 </div>
 
-                {/* Description */}
+                {/* Capacity indicator */}
+                <CapacityIndicator
+                  attendeeCount={moment.attendeeCount}
+                  maxAttendees={moment.maxAttendees}
+                  waitlistCount={moment.waitlistCount}
+                />
+
                 {moment.description && (
                   <p className="text-sm text-muted-foreground font-body leading-relaxed">
                     {moment.description}
                   </p>
                 )}
 
-                {/* Tags */}
                 {moment.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {moment.tags.map((tag) => (
@@ -520,7 +991,7 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
                 <RsvpButton momentId={momentId} />
               </div>
 
-              {/* Event Pass button — attending only */}
+              {/* Event Pass — attending only */}
               {isAttending && (
                 <motion.button
                   type="button"
@@ -540,11 +1011,23 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
               )}
 
               {/* Share section */}
-              {showShare && <ShareSection momentId={moment.id} />}
+              {showShare && (
+                <ShareSection momentId={moment.id} moment={moment} />
+              )}
             </motion.div>
 
-            {/* Glass tab bar */}
-            <div className="sticky top-0 z-header py-3 bg-background/80 backdrop-blur-md -mx-4 px-4">
+            {/* Announcements — below info card, above tabs */}
+            {(moment.isOwner || isAttending) && (
+              <div className="mt-4">
+                <AnnouncementsSection
+                  momentId={momentId}
+                  isOwner={moment.isOwner}
+                />
+              </div>
+            )}
+
+            {/* Tab bar */}
+            <div className="sticky top-0 z-header py-3 bg-background/80 backdrop-blur-md -mx-4 px-4 mt-4">
               <GlassTabBar
                 tabs={tabs}
                 active={validActiveTab}
@@ -574,7 +1057,11 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
                     />
                   )}
                   {validActiveTab === "people" && (
-                    <AttendeesTab momentId={momentId} />
+                    <AttendeesTab
+                      momentId={momentId}
+                      maxAttendees={moment.maxAttendees}
+                      isOwner={moment.isOwner}
+                    />
                   )}
                   {validActiveTab === "access" && showAccessTab && (
                     <AccessRequestsPanel momentId={moment.id} />
@@ -582,6 +1069,13 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
                 </motion.div>
               </AnimatePresence>
             </div>
+
+            {/* Agenda timeline — below tab content */}
+            {moment.agendaItems.length > 0 && (
+              <div className="mt-6 glass-card rounded-2xl p-4">
+                <AgendaTimeline items={moment.agendaItems} />
+              </div>
+            )}
           </div>
         )}
       </Layout>

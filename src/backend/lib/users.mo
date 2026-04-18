@@ -14,6 +14,8 @@ module {
     usernameIndex : Map.Map<Text, Common.UserId>;
     followers : Map.Map<Common.UserId, Set.Set<Common.UserId>>;
     following : Map.Map<Common.UserId, Set.Set<Common.UserId>>;
+    // Bookmarked moment IDs per user
+    bookmarks : Map.Map<Common.UserId, Set.Set<Common.MomentId>>;
   };
 
   public func initState() : UsersState {
@@ -22,6 +24,7 @@ module {
       usernameIndex = Map.empty<Text, Common.UserId>();
       followers = Map.empty<Common.UserId, Set.Set<Common.UserId>>();
       following = Map.empty<Common.UserId, Set.Set<Common.UserId>>();
+      bookmarks = Map.empty<Common.UserId, Set.Set<Common.MomentId>>();
     };
   };
 
@@ -53,6 +56,12 @@ module {
       followersCount = followerCount(state, profile.id);
       followingCount = followingCount(state, profile.id);
       createdAt = profile.createdAt;
+      isPrivateProfile = profile.isPrivateProfile;
+      hideAttendingList = profile.hideAttendingList;
+      // hostedCount and attendedCount are derived from moments data;
+      // the mixin layer is responsible for computing these when needed.
+      hostedCount = 0;
+      attendedCount = 0;
     };
   };
 
@@ -103,6 +112,8 @@ module {
       socials = input.socials;
       paymentDetails = input.paymentDetails;
       createdAt = createdAt;
+      isPrivateProfile = input.isPrivateProfile;
+      hideAttendingList = input.hideAttendingList;
     };
 
     state.profiles.add(userId, profile);
@@ -255,8 +266,27 @@ module {
       case null {};
     };
 
-    // Remove own follower/following maps
+    // Remove own follower/following/bookmark maps
     state.followers.remove(userId);
     state.following.remove(userId);
+    state.bookmarks.remove(userId);
+  };
+
+  // ── Bookmarks ─────────────────────────────────────────────────────────────
+
+  public func bookmarkMoment(state : UsersState, userId : Common.UserId, momentId : Common.MomentId) : () {
+    Runtime.trap("not implemented");
+  };
+
+  public func unbookmarkMoment(state : UsersState, userId : Common.UserId, momentId : Common.MomentId) : () {
+    Runtime.trap("not implemented");
+  };
+
+  public func getBookmarks(state : UsersState, userId : Common.UserId) : [Common.MomentId] {
+    Runtime.trap("not implemented");
+  };
+
+  public func isBookmarked(state : UsersState, userId : Common.UserId, momentId : Common.MomentId) : Bool {
+    Runtime.trap("not implemented");
   };
 };

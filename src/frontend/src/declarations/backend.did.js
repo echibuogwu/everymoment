@@ -104,6 +104,7 @@ export const MomentListItem = IDL.Record({
   'title' : IDL.Text,
   'attendeeCount' : IDL.Nat,
   'owner' : UserId,
+  'maxAttendees' : IDL.Opt(IDL.Nat),
   'createdAt' : Timestamp,
   'tags' : IDL.Vec(IDL.Text),
   'description' : IDL.Text,
@@ -111,6 +112,7 @@ export const MomentListItem = IDL.Record({
   'coverImage' : IDL.Opt(ExternalBlob),
   'occurrenceDate' : IDL.Opt(Timestamp),
   'callerRelation' : IDL.Opt(CallerRelation),
+  'waitlistCount' : IDL.Nat,
   'visibility' : Visibility,
   'location' : IDL.Text,
   'eventDate' : Timestamp,
@@ -123,11 +125,15 @@ export const PaymentDetail = IDL.Record({
 export const UserProfilePublic = IDL.Record({
   'id' : UserId,
   'username' : IDL.Text,
+  'hideAttendingList' : IDL.Bool,
   'followersCount' : IDL.Nat,
   'name' : IDL.Opt(IDL.Text),
   'createdAt' : Timestamp,
   'socials' : IDL.Opt(IDL.Vec(SocialLink)),
   'paymentDetails' : IDL.Opt(IDL.Vec(PaymentDetail)),
+  'isPrivateProfile' : IDL.Bool,
+  'hostedCount' : IDL.Nat,
+  'attendedCount' : IDL.Nat,
   'followingCount' : IDL.Nat,
   'photo' : IDL.Opt(ExternalBlob),
   'location' : IDL.Opt(IDL.Text),
@@ -145,7 +151,15 @@ export const CreateMomentInput = IDL.Record({
   'locationLat' : IDL.Opt(IDL.Float64),
   'locationLng' : IDL.Opt(IDL.Float64),
   'title' : IDL.Text,
+  'maxAttendees' : IDL.Opt(IDL.Nat),
   'tags' : IDL.Vec(IDL.Text),
+  'agendaItems' : IDL.Vec(
+    IDL.Record({
+      'title' : IDL.Text,
+      'time' : IDL.Text,
+      'description' : IDL.Opt(IDL.Text),
+    })
+  ),
   'description' : IDL.Text,
   'recurrence' : IDL.Opt(RecurrenceRule),
   'coverImage' : IDL.Opt(ExternalBlob),
@@ -154,6 +168,34 @@ export const CreateMomentInput = IDL.Record({
   'eventDate' : Timestamp,
 });
 export const MemoryId = IDL.Text;
+export const ActivityKind = IDL.Variant({
+  'rsvpdToMoment' : IDL.Null,
+  'createdMoment' : IDL.Null,
+  'followedUser' : IDL.Null,
+});
+export const ActivityEvent = IDL.Record({
+  'id' : IDL.Nat,
+  'kind' : ActivityKind,
+  'createdAt' : Timestamp,
+  'momentId' : IDL.Opt(MomentId),
+  'actorId' : UserId,
+  'targetUserId' : IDL.Opt(UserId),
+});
+export const Announcement = IDL.Record({
+  'id' : IDL.Nat,
+  'authorId' : UserId,
+  'createdAt' : Timestamp,
+  'text' : IDL.Text,
+  'momentId' : MomentId,
+});
+export const Message = IDL.Record({
+  'id' : IDL.Nat,
+  'createdAt' : Timestamp,
+  'text' : IDL.Text,
+  'isRead' : IDL.Bool,
+  'recipientId' : UserId,
+  'senderId' : UserId,
+});
 export const AttendanceInfo = IDL.Record({
   'status' : IDL.Text,
   'rsvpTime' : Timestamp,
@@ -189,6 +231,12 @@ export const Attendee = IDL.Record({
   'joinedAt' : Timestamp,
   'momentId' : MomentId,
 });
+export const AgendaItem = IDL.Record({
+  'id' : IDL.Nat,
+  'title' : IDL.Text,
+  'time' : IDL.Text,
+  'description' : IDL.Opt(IDL.Text),
+});
 export const MomentDetail = IDL.Record({
   'id' : MomentId,
   'locationLat' : IDL.Opt(IDL.Float64),
@@ -197,16 +245,41 @@ export const MomentDetail = IDL.Record({
   'attendeeCount' : IDL.Nat,
   'callerAccessStatus' : IDL.Opt(AccessStatus),
   'owner' : UserId,
+  'maxAttendees' : IDL.Opt(IDL.Nat),
   'createdAt' : Timestamp,
   'tags' : IDL.Vec(IDL.Text),
+  'agendaItems' : IDL.Vec(AgendaItem),
   'description' : IDL.Text,
   'recurrence' : IDL.Opt(RecurrenceRule),
   'coverImage' : IDL.Opt(ExternalBlob),
   'updatedAt' : Timestamp,
+  'waitlistCount' : IDL.Nat,
   'visibility' : Visibility,
   'isOwner' : IDL.Bool,
   'location' : IDL.Text,
   'eventDate' : Timestamp,
+});
+export const ConversationSummary = IDL.Record({
+  'userId' : UserId,
+  'lastMessage' : Message,
+  'unreadCount' : IDL.Nat,
+});
+export const NotificationKind = IDL.Variant({
+  'accessRequestResolved' : IDL.Null,
+  'rsvpToYourMoment' : IDL.Null,
+  'mentioned' : IDL.Null,
+  'newAnnouncement' : IDL.Null,
+  'newFollower' : IDL.Null,
+  'newMessage' : IDL.Null,
+});
+export const Notification = IDL.Record({
+  'id' : IDL.Nat,
+  'kind' : NotificationKind,
+  'createdAt' : Timestamp,
+  'referenceId' : IDL.Opt(IDL.Text),
+  'isRead' : IDL.Bool,
+  'message' : IDL.Text,
+  'recipientId' : UserId,
 });
 export const Comment = IDL.Record({
   'id' : CommentId,
@@ -237,9 +310,11 @@ export const AccessRequest = IDL.Record({
 });
 export const SaveProfileInput = IDL.Record({
   'username' : IDL.Text,
+  'hideAttendingList' : IDL.Bool,
   'name' : IDL.Opt(IDL.Text),
   'socials' : IDL.Opt(IDL.Vec(SocialLink)),
   'paymentDetails' : IDL.Opt(IDL.Vec(PaymentDetail)),
+  'isPrivateProfile' : IDL.Bool,
   'photo' : IDL.Opt(ExternalBlob),
   'location' : IDL.Opt(IDL.Text),
 });
@@ -247,7 +322,15 @@ export const UpdateMomentInput = IDL.Record({
   'locationLat' : IDL.Opt(IDL.Float64),
   'locationLng' : IDL.Opt(IDL.Float64),
   'title' : IDL.Text,
+  'maxAttendees' : IDL.Opt(IDL.Nat),
   'tags' : IDL.Vec(IDL.Text),
+  'agendaItems' : IDL.Vec(
+    IDL.Record({
+      'title' : IDL.Text,
+      'time' : IDL.Text,
+      'description' : IDL.Opt(IDL.Text),
+    })
+  ),
   'description' : IDL.Text,
   'recurrence' : IDL.Opt(RecurrenceRule),
   'coverImage' : IDL.Opt(ExternalBlob),
@@ -305,8 +388,10 @@ export const idlService = IDL.Service({
   'adminListMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
   'adminListUsers' : IDL.Func([], [IDL.Vec(UserProfilePublic)], ['query']),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'bookmarkMoment' : IDL.Func([MomentId], [], []),
   'createFolder' : IDL.Func([CreateFolderInput], [FolderId], []),
   'createMoment' : IDL.Func([CreateMomentInput], [MomentId], []),
+  'deleteAnnouncement' : IDL.Func([MomentId, IDL.Nat], [], []),
   'deleteComment' : IDL.Func([CommentId], [], []),
   'deleteFolder' : IDL.Func([FolderId], [], []),
   'deleteMedia' : IDL.Func([MediaId], [], []),
@@ -317,12 +402,19 @@ export const idlService = IDL.Service({
     ),
   'deleteMoment' : IDL.Func([MomentId], [], []),
   'followUser' : IDL.Func([UserId], [], []),
+  'getActivityFeed' : IDL.Func([], [IDL.Vec(ActivityEvent)], ['query']),
+  'getAnnouncementsForMoment' : IDL.Func(
+      [MomentId],
+      [IDL.Vec(Announcement)],
+      ['query'],
+    ),
   'getCallerUserProfile' : IDL.Func(
       [],
       [IDL.Opt(UserProfilePublic)],
       ['query'],
     ),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getConversation' : IDL.Func([UserId], [IDL.Vec(Message)], ['query']),
   'getEventPassInfo' : IDL.Func(
       [MomentId, UserId],
       [IDL.Variant({ 'ok' : AttendanceInfo, 'err' : IDL.Text })],
@@ -347,6 +439,7 @@ export const idlService = IDL.Service({
   'getMomentPublicUrl' : IDL.Func([MomentId], [IDL.Text], ['query']),
   'getMomentQrCode' : IDL.Func([MomentId], [IDL.Text], ['query']),
   'getMomentShareUrl' : IDL.Func([MomentId], [IDL.Text], ['query']),
+  'getMomentWaitlist' : IDL.Func([MomentId], [IDL.Vec(UserId)], ['query']),
   'getMomentsForUser' : IDL.Func(
       [UserId],
       [IDL.Vec(MomentListItem)],
@@ -357,12 +450,21 @@ export const idlService = IDL.Service({
       [IDL.Opt(AttendanceInfo)],
       ['query'],
     ),
+  'getMyBookmarks' : IDL.Func([], [IDL.Vec(MomentId)], ['query']),
   'getMyCalendarMoments' : IDL.Func(
       [Timestamp, Timestamp],
       [IDL.Vec(MomentListItem)],
       ['query'],
     ),
+  'getMyConversations' : IDL.Func(
+      [],
+      [IDL.Vec(ConversationSummary)],
+      ['query'],
+    ),
   'getMyMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
+  'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+  'getUnreadMessageCount' : IDL.Func([], [IDL.Nat], ['query']),
+  'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
   'getUserProfile' : IDL.Func(
       [UserId],
       [IDL.Opt(UserProfilePublic)],
@@ -374,6 +476,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'hasLikedMedia' : IDL.Func([MediaId], [IDL.Bool], ['query']),
+  'isBookmarked' : IDL.Func([MomentId], [IDL.Bool], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isFollowingUser' : IDL.Func([UserId], [IDL.Bool], ['query']),
   'isUsernameTaken' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
@@ -390,6 +493,10 @@ export const idlService = IDL.Service({
       [IDL.Vec(AccessRequest)],
       ['query'],
     ),
+  'markAllNotificationsRead' : IDL.Func([], [], []),
+  'markConversationRead' : IDL.Func([UserId], [], []),
+  'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+  'postAnnouncement' : IDL.Func([MomentId, IDL.Text], [Announcement], []),
   'postMemory' : IDL.Func(
       [MomentId, IDL.Text, IDL.Opt(ExternalBlob), IDL.Opt(MemoryMediaKind)],
       [IDL.Variant({ 'ok' : MemoryId, 'err' : IDL.Text })],
@@ -418,8 +525,10 @@ export const idlService = IDL.Service({
       [IDL.Vec(MomentListItem)],
       ['query'],
     ),
+  'sendMessage' : IDL.Func([UserId, IDL.Text], [IDL.Nat], []),
   'setRsvp' : IDL.Func([MomentId, RsvpStatus], [], []),
   'toggleLike' : IDL.Func([MediaId], [IDL.Nat], []),
+  'unbookmarkMoment' : IDL.Func([MomentId], [], []),
   'unfollowUser' : IDL.Func([UserId], [], []),
   'updateMoment' : IDL.Func([MomentId, UpdateMomentInput], [], []),
   'uploadMedia' : IDL.Func([UploadMediaInput], [MediaId], []),
@@ -521,6 +630,7 @@ export const idlFactory = ({ IDL }) => {
     'title' : IDL.Text,
     'attendeeCount' : IDL.Nat,
     'owner' : UserId,
+    'maxAttendees' : IDL.Opt(IDL.Nat),
     'createdAt' : Timestamp,
     'tags' : IDL.Vec(IDL.Text),
     'description' : IDL.Text,
@@ -528,6 +638,7 @@ export const idlFactory = ({ IDL }) => {
     'coverImage' : IDL.Opt(ExternalBlob),
     'occurrenceDate' : IDL.Opt(Timestamp),
     'callerRelation' : IDL.Opt(CallerRelation),
+    'waitlistCount' : IDL.Nat,
     'visibility' : Visibility,
     'location' : IDL.Text,
     'eventDate' : Timestamp,
@@ -537,11 +648,15 @@ export const idlFactory = ({ IDL }) => {
   const UserProfilePublic = IDL.Record({
     'id' : UserId,
     'username' : IDL.Text,
+    'hideAttendingList' : IDL.Bool,
     'followersCount' : IDL.Nat,
     'name' : IDL.Opt(IDL.Text),
     'createdAt' : Timestamp,
     'socials' : IDL.Opt(IDL.Vec(SocialLink)),
     'paymentDetails' : IDL.Opt(IDL.Vec(PaymentDetail)),
+    'isPrivateProfile' : IDL.Bool,
+    'hostedCount' : IDL.Nat,
+    'attendedCount' : IDL.Nat,
     'followingCount' : IDL.Nat,
     'photo' : IDL.Opt(ExternalBlob),
     'location' : IDL.Opt(IDL.Text),
@@ -559,7 +674,15 @@ export const idlFactory = ({ IDL }) => {
     'locationLat' : IDL.Opt(IDL.Float64),
     'locationLng' : IDL.Opt(IDL.Float64),
     'title' : IDL.Text,
+    'maxAttendees' : IDL.Opt(IDL.Nat),
     'tags' : IDL.Vec(IDL.Text),
+    'agendaItems' : IDL.Vec(
+      IDL.Record({
+        'title' : IDL.Text,
+        'time' : IDL.Text,
+        'description' : IDL.Opt(IDL.Text),
+      })
+    ),
     'description' : IDL.Text,
     'recurrence' : IDL.Opt(RecurrenceRule),
     'coverImage' : IDL.Opt(ExternalBlob),
@@ -568,6 +691,34 @@ export const idlFactory = ({ IDL }) => {
     'eventDate' : Timestamp,
   });
   const MemoryId = IDL.Text;
+  const ActivityKind = IDL.Variant({
+    'rsvpdToMoment' : IDL.Null,
+    'createdMoment' : IDL.Null,
+    'followedUser' : IDL.Null,
+  });
+  const ActivityEvent = IDL.Record({
+    'id' : IDL.Nat,
+    'kind' : ActivityKind,
+    'createdAt' : Timestamp,
+    'momentId' : IDL.Opt(MomentId),
+    'actorId' : UserId,
+    'targetUserId' : IDL.Opt(UserId),
+  });
+  const Announcement = IDL.Record({
+    'id' : IDL.Nat,
+    'authorId' : UserId,
+    'createdAt' : Timestamp,
+    'text' : IDL.Text,
+    'momentId' : MomentId,
+  });
+  const Message = IDL.Record({
+    'id' : IDL.Nat,
+    'createdAt' : Timestamp,
+    'text' : IDL.Text,
+    'isRead' : IDL.Bool,
+    'recipientId' : UserId,
+    'senderId' : UserId,
+  });
   const AttendanceInfo = IDL.Record({
     'status' : IDL.Text,
     'rsvpTime' : Timestamp,
@@ -603,6 +754,12 @@ export const idlFactory = ({ IDL }) => {
     'joinedAt' : Timestamp,
     'momentId' : MomentId,
   });
+  const AgendaItem = IDL.Record({
+    'id' : IDL.Nat,
+    'title' : IDL.Text,
+    'time' : IDL.Text,
+    'description' : IDL.Opt(IDL.Text),
+  });
   const MomentDetail = IDL.Record({
     'id' : MomentId,
     'locationLat' : IDL.Opt(IDL.Float64),
@@ -611,16 +768,41 @@ export const idlFactory = ({ IDL }) => {
     'attendeeCount' : IDL.Nat,
     'callerAccessStatus' : IDL.Opt(AccessStatus),
     'owner' : UserId,
+    'maxAttendees' : IDL.Opt(IDL.Nat),
     'createdAt' : Timestamp,
     'tags' : IDL.Vec(IDL.Text),
+    'agendaItems' : IDL.Vec(AgendaItem),
     'description' : IDL.Text,
     'recurrence' : IDL.Opt(RecurrenceRule),
     'coverImage' : IDL.Opt(ExternalBlob),
     'updatedAt' : Timestamp,
+    'waitlistCount' : IDL.Nat,
     'visibility' : Visibility,
     'isOwner' : IDL.Bool,
     'location' : IDL.Text,
     'eventDate' : Timestamp,
+  });
+  const ConversationSummary = IDL.Record({
+    'userId' : UserId,
+    'lastMessage' : Message,
+    'unreadCount' : IDL.Nat,
+  });
+  const NotificationKind = IDL.Variant({
+    'accessRequestResolved' : IDL.Null,
+    'rsvpToYourMoment' : IDL.Null,
+    'mentioned' : IDL.Null,
+    'newAnnouncement' : IDL.Null,
+    'newFollower' : IDL.Null,
+    'newMessage' : IDL.Null,
+  });
+  const Notification = IDL.Record({
+    'id' : IDL.Nat,
+    'kind' : NotificationKind,
+    'createdAt' : Timestamp,
+    'referenceId' : IDL.Opt(IDL.Text),
+    'isRead' : IDL.Bool,
+    'message' : IDL.Text,
+    'recipientId' : UserId,
   });
   const Comment = IDL.Record({
     'id' : CommentId,
@@ -651,9 +833,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const SaveProfileInput = IDL.Record({
     'username' : IDL.Text,
+    'hideAttendingList' : IDL.Bool,
     'name' : IDL.Opt(IDL.Text),
     'socials' : IDL.Opt(IDL.Vec(SocialLink)),
     'paymentDetails' : IDL.Opt(IDL.Vec(PaymentDetail)),
+    'isPrivateProfile' : IDL.Bool,
     'photo' : IDL.Opt(ExternalBlob),
     'location' : IDL.Opt(IDL.Text),
   });
@@ -661,7 +845,15 @@ export const idlFactory = ({ IDL }) => {
     'locationLat' : IDL.Opt(IDL.Float64),
     'locationLng' : IDL.Opt(IDL.Float64),
     'title' : IDL.Text,
+    'maxAttendees' : IDL.Opt(IDL.Nat),
     'tags' : IDL.Vec(IDL.Text),
+    'agendaItems' : IDL.Vec(
+      IDL.Record({
+        'title' : IDL.Text,
+        'time' : IDL.Text,
+        'description' : IDL.Opt(IDL.Text),
+      })
+    ),
     'description' : IDL.Text,
     'recurrence' : IDL.Opt(RecurrenceRule),
     'coverImage' : IDL.Opt(ExternalBlob),
@@ -719,8 +911,10 @@ export const idlFactory = ({ IDL }) => {
     'adminListMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
     'adminListUsers' : IDL.Func([], [IDL.Vec(UserProfilePublic)], ['query']),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'bookmarkMoment' : IDL.Func([MomentId], [], []),
     'createFolder' : IDL.Func([CreateFolderInput], [FolderId], []),
     'createMoment' : IDL.Func([CreateMomentInput], [MomentId], []),
+    'deleteAnnouncement' : IDL.Func([MomentId, IDL.Nat], [], []),
     'deleteComment' : IDL.Func([CommentId], [], []),
     'deleteFolder' : IDL.Func([FolderId], [], []),
     'deleteMedia' : IDL.Func([MediaId], [], []),
@@ -731,12 +925,19 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deleteMoment' : IDL.Func([MomentId], [], []),
     'followUser' : IDL.Func([UserId], [], []),
+    'getActivityFeed' : IDL.Func([], [IDL.Vec(ActivityEvent)], ['query']),
+    'getAnnouncementsForMoment' : IDL.Func(
+        [MomentId],
+        [IDL.Vec(Announcement)],
+        ['query'],
+      ),
     'getCallerUserProfile' : IDL.Func(
         [],
         [IDL.Opt(UserProfilePublic)],
         ['query'],
       ),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getConversation' : IDL.Func([UserId], [IDL.Vec(Message)], ['query']),
     'getEventPassInfo' : IDL.Func(
         [MomentId, UserId],
         [IDL.Variant({ 'ok' : AttendanceInfo, 'err' : IDL.Text })],
@@ -773,6 +974,7 @@ export const idlFactory = ({ IDL }) => {
     'getMomentPublicUrl' : IDL.Func([MomentId], [IDL.Text], ['query']),
     'getMomentQrCode' : IDL.Func([MomentId], [IDL.Text], ['query']),
     'getMomentShareUrl' : IDL.Func([MomentId], [IDL.Text], ['query']),
+    'getMomentWaitlist' : IDL.Func([MomentId], [IDL.Vec(UserId)], ['query']),
     'getMomentsForUser' : IDL.Func(
         [UserId],
         [IDL.Vec(MomentListItem)],
@@ -783,12 +985,21 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(AttendanceInfo)],
         ['query'],
       ),
+    'getMyBookmarks' : IDL.Func([], [IDL.Vec(MomentId)], ['query']),
     'getMyCalendarMoments' : IDL.Func(
         [Timestamp, Timestamp],
         [IDL.Vec(MomentListItem)],
         ['query'],
       ),
+    'getMyConversations' : IDL.Func(
+        [],
+        [IDL.Vec(ConversationSummary)],
+        ['query'],
+      ),
     'getMyMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
+    'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+    'getUnreadMessageCount' : IDL.Func([], [IDL.Nat], ['query']),
+    'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getUserProfile' : IDL.Func(
         [UserId],
         [IDL.Opt(UserProfilePublic)],
@@ -800,6 +1011,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'hasLikedMedia' : IDL.Func([MediaId], [IDL.Bool], ['query']),
+    'isBookmarked' : IDL.Func([MomentId], [IDL.Bool], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isFollowingUser' : IDL.Func([UserId], [IDL.Bool], ['query']),
     'isUsernameTaken' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
@@ -820,6 +1032,10 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(AccessRequest)],
         ['query'],
       ),
+    'markAllNotificationsRead' : IDL.Func([], [], []),
+    'markConversationRead' : IDL.Func([UserId], [], []),
+    'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+    'postAnnouncement' : IDL.Func([MomentId, IDL.Text], [Announcement], []),
     'postMemory' : IDL.Func(
         [MomentId, IDL.Text, IDL.Opt(ExternalBlob), IDL.Opt(MemoryMediaKind)],
         [IDL.Variant({ 'ok' : MemoryId, 'err' : IDL.Text })],
@@ -848,8 +1064,10 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(MomentListItem)],
         ['query'],
       ),
+    'sendMessage' : IDL.Func([UserId, IDL.Text], [IDL.Nat], []),
     'setRsvp' : IDL.Func([MomentId, RsvpStatus], [], []),
     'toggleLike' : IDL.Func([MediaId], [IDL.Nat], []),
+    'unbookmarkMoment' : IDL.Func([MomentId], [], []),
     'unfollowUser' : IDL.Func([UserId], [], []),
     'updateMoment' : IDL.Func([MomentId, UpdateMomentInput], [], []),
     'uploadMedia' : IDL.Func([UploadMediaInput], [MediaId], []),
