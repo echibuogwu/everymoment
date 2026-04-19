@@ -93,9 +93,14 @@ export interface Comment {
   'mediaId' : MediaId,
 }
 export type CommentId = bigint;
+export interface ConversationInboxResult {
+  'requests' : Array<ConversationSummary>,
+  'accepted' : Array<ConversationSummary>,
+}
 export interface ConversationSummary {
   'userId' : UserId,
   'lastMessage' : Message,
+  'isMessageRequest' : boolean,
   'unreadCount' : bigint,
 }
 export interface CreateFolderInput { 'name' : string, 'momentId' : MomentId }
@@ -103,6 +108,7 @@ export interface CreateMomentInput {
   'locationLat' : [] | [number],
   'locationLng' : [] | [number],
   'title' : string,
+  'endDate' : [] | [Timestamp],
   'maxAttendees' : [] | [bigint],
   'tags' : Array<string>,
   'agendaItems' : Array<
@@ -124,6 +130,16 @@ export interface Folder {
   'isDefault' : boolean,
 }
 export type FolderId = bigint;
+export interface FollowRequest {
+  'id' : string,
+  'status' : FollowRequestStatus,
+  'createdAt' : Timestamp,
+  'toId' : UserId,
+  'fromId' : UserId,
+}
+export type FollowRequestStatus = { 'pending' : null } |
+  { 'rejected' : null } |
+  { 'accepted' : null };
 export interface Media {
   'id' : MediaId,
   'likeCount' : bigint,
@@ -174,6 +190,7 @@ export interface MomentDetail {
   'locationLng' : [] | [number],
   'title' : string,
   'attendeeCount' : bigint,
+  'endDate' : [] | [Timestamp],
   'callerAccessStatus' : [] | [AccessStatus],
   'owner' : UserId,
   'maxAttendees' : [] | [bigint],
@@ -197,6 +214,7 @@ export interface MomentListItem {
   'locationLng' : [] | [number],
   'title' : string,
   'attendeeCount' : bigint,
+  'endDate' : [] | [Timestamp],
   'owner' : UserId,
   'maxAttendees' : [] | [bigint],
   'createdAt' : Timestamp,
@@ -259,6 +277,7 @@ export interface UpdateMomentInput {
   'locationLat' : [] | [number],
   'locationLng' : [] | [number],
   'title' : string,
+  'endDate' : [] | [Timestamp],
   'maxAttendees' : [] | [bigint],
   'tags' : Array<string>,
   'agendaItems' : Array<
@@ -293,6 +312,7 @@ export interface UserProfilePublic {
   'attendedCount' : bigint,
   'followingCount' : bigint,
   'photo' : [] | [ExternalBlob],
+  'isPrivateHidden' : boolean,
   'location' : [] | [string],
 }
 export type UserRole = { 'admin' : null } |
@@ -331,6 +351,8 @@ export interface _SERVICE {
   >,
   '_immutableObjectStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControl' : ActorMethod<[], undefined>,
+  'acceptFollowRequest' : ActorMethod<[string], undefined>,
+  'acceptMessageRequest' : ActorMethod<[UserId], undefined>,
   'addComment' : ActorMethod<[AddCommentInput], CommentId>,
   'adminBulkImportMoments' : ActorMethod<
     [Array<BulkImportMomentRow>],
@@ -345,6 +367,7 @@ export interface _SERVICE {
   'adminListUsers' : ActorMethod<[], Array<UserProfilePublic>>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'bookmarkMoment' : ActorMethod<[MomentId], undefined>,
+  'cancelFollowRequest' : ActorMethod<[string], undefined>,
   'createFolder' : ActorMethod<[CreateFolderInput], FolderId>,
   'createMoment' : ActorMethod<[CreateMomentInput], MomentId>,
   'deleteAnnouncement' : ActorMethod<[MomentId, bigint], undefined>,
@@ -356,8 +379,9 @@ export interface _SERVICE {
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'deleteMessageRequest' : ActorMethod<[UserId], undefined>,
   'deleteMoment' : ActorMethod<[MomentId], undefined>,
-  'followUser' : ActorMethod<[UserId], undefined>,
+  'followUser' : ActorMethod<[UserId], boolean>,
   'getActivityFeed' : ActorMethod<[], Array<ActivityEvent>>,
   'getAnnouncementsForMoment' : ActorMethod<[MomentId], Array<Announcement>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfilePublic]>,
@@ -369,6 +393,7 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'getFeedMoments' : ActorMethod<[], Array<MomentListItem>>,
+  'getFollowRequestStatus' : ActorMethod<[UserId], [] | [FollowRequest]>,
   'getFollowers' : ActorMethod<[UserId], Array<UserProfilePublic>>,
   'getFollowing' : ActorMethod<[UserId], Array<UserProfilePublic>>,
   'getMedia' : ActorMethod<[MediaId], [] | [Media]>,
@@ -391,9 +416,10 @@ export interface _SERVICE {
     [Timestamp, Timestamp],
     Array<MomentListItem>
   >,
-  'getMyConversations' : ActorMethod<[], Array<ConversationSummary>>,
+  'getMyConversations' : ActorMethod<[], ConversationInboxResult>,
   'getMyMoments' : ActorMethod<[], Array<MomentListItem>>,
   'getMyNotifications' : ActorMethod<[], Array<Notification>>,
+  'getPendingFollowRequests' : ActorMethod<[], Array<FollowRequest>>,
   'getUnreadMessageCount' : ActorMethod<[], bigint>,
   'getUnreadNotificationCount' : ActorMethod<[], bigint>,
   'getUserProfile' : ActorMethod<[UserId], [] | [UserProfilePublic]>,
@@ -417,6 +443,7 @@ export interface _SERVICE {
     { 'ok' : MemoryId } |
       { 'err' : string }
   >,
+  'rejectFollowRequest' : ActorMethod<[string], undefined>,
   'requestMomentAccess' : ActorMethod<
     [MomentId],
     { 'ok' : null } |
@@ -439,6 +466,7 @@ export interface _SERVICE {
     ],
     Array<MomentListItem>
   >,
+  'searchUsers' : ActorMethod<[string, bigint], Array<UserProfilePublic>>,
   'sendMessage' : ActorMethod<[UserId, string], bigint>,
   'setRsvp' : ActorMethod<[MomentId, RsvpStatus], undefined>,
   'toggleLike' : ActorMethod<[MediaId], bigint>,

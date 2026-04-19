@@ -1,6 +1,6 @@
 import Map "mo:core/Map";
 import List "mo:core/List";
-import Runtime "mo:core/Runtime";
+import Time "mo:core/Time";
 import Common "../types/common";
 import T "../types/notifications";
 
@@ -26,14 +26,41 @@ module {
     referenceId : ?Text,
     message : Text
   ) : () {
-    Runtime.trap("not implemented");
+    let id = state.nextNotificationId;
+    state.nextNotificationId += 1;
+
+    let notif : T.Notification = {
+      id;
+      recipientId;
+      kind;
+      referenceId;
+      message;
+      createdAt = Time.now();
+      isRead = false;
+    };
+
+    let list = switch (state.notifications.get(recipientId)) {
+      case (?existing) existing;
+      case null {
+        let newList = List.empty<T.Notification>();
+        state.notifications.add(recipientId, newList);
+        newList;
+      };
+    };
+    list.add(notif);
   };
 
   public func getNotifications(
     state : NotificationsState,
     userId : Common.UserId
   ) : [T.Notification] {
-    Runtime.trap("not implemented");
+    switch (state.notifications.get(userId)) {
+      case (?list) {
+        // Return newest first
+        list.reverse().toArray();
+      };
+      case null [];
+    };
   };
 
   public func markRead(
@@ -41,20 +68,43 @@ module {
     userId : Common.UserId,
     notificationId : Nat
   ) : () {
-    Runtime.trap("not implemented");
+    switch (state.notifications.get(userId)) {
+      case (?list) {
+        list.mapInPlace(func(n : T.Notification) : T.Notification {
+          if (n.id == notificationId) { { n with isRead = true } } else { n }
+        });
+      };
+      case null {};
+    };
   };
 
   public func markAllRead(
     state : NotificationsState,
     userId : Common.UserId
   ) : () {
-    Runtime.trap("not implemented");
+    switch (state.notifications.get(userId)) {
+      case (?list) {
+        list.mapInPlace(func(n : T.Notification) : T.Notification {
+          { n with isRead = true }
+        });
+      };
+      case null {};
+    };
   };
 
   public func unreadCount(
     state : NotificationsState,
     userId : Common.UserId
   ) : Nat {
-    Runtime.trap("not implemented");
+    switch (state.notifications.get(userId)) {
+      case (?list) {
+        var count = 0;
+        list.forEach(func(n : T.Notification) {
+          if (not n.isRead) count += 1;
+        });
+        count;
+      };
+      case null 0;
+    };
   };
 };

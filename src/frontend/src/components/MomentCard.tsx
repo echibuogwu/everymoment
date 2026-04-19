@@ -1,6 +1,21 @@
 import { cn } from "@/lib/utils";
-import { Calendar, Globe, Lock, MapPin, Users } from "lucide-react";
+import {
+  Bookmark,
+  BookmarkCheck,
+  Calendar,
+  Globe,
+  Lock,
+  MapPin,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "../hooks/use-auth";
+import {
+  useBookmarkMoment,
+  useIsBookmarked,
+  useUnbookmarkMoment,
+} from "../hooks/use-backend";
+import { showError, showSuccess } from "../lib/toast";
 import { Visibility } from "../types";
 import type { MomentListItem } from "../types";
 
@@ -34,6 +49,72 @@ export function isPrivateVisibility(
   }
   return false;
 }
+
+// ── Inline bookmark button used on the card ───────────────────────────────────
+
+function CardBookmarkButton({
+  momentId,
+  onClick: stopProp,
+}: {
+  momentId: string;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  const { isAuthenticated } = useAuth();
+  const { data: isBookmarked } = useIsBookmarked(
+    isAuthenticated ? momentId : null,
+  );
+  const bookmarkMutation = useBookmarkMoment();
+  const unbookmarkMutation = useUnbookmarkMoment();
+
+  if (!isAuthenticated) return null;
+
+  const isPending = bookmarkMutation.isPending || unbookmarkMutation.isPending;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    stopProp(e);
+    if (isPending) return;
+    if (isBookmarked) {
+      unbookmarkMutation.mutate(momentId, {
+        onSuccess: () => showSuccess("Bookmark removed"),
+        onError: () => showError("Failed to update bookmark"),
+      });
+    } else {
+      bookmarkMutation.mutate(momentId, {
+        onSuccess: () => showSuccess("Moment saved"),
+        onError: () => showError("Failed to save moment"),
+      });
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={isPending}
+      aria-label={isBookmarked ? "Remove bookmark" : "Save moment"}
+      data-ocid="moment-card.bookmark_button"
+      className={cn(
+        "flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all duration-200",
+        "backdrop-blur-md border",
+        isBookmarked
+          ? "bg-accent text-accent-foreground border-accent/60 shadow-sm"
+          : "bg-background/80 text-foreground border-white/20 hover:bg-background/90",
+        "disabled:opacity-60",
+      )}
+    >
+      {isBookmarked ? (
+        <BookmarkCheck className="w-3 h-3" />
+      ) : (
+        <Bookmark className="w-3 h-3" />
+      )}
+      <span>{isBookmarked ? "Saved" : "Save"}</span>
+    </button>
+  );
+}
+
+// ── MomentCard ────────────────────────────────────────────────────────────────
 
 interface MomentCardProps {
   moment: MomentListItem;
@@ -104,8 +185,9 @@ export function MomentCard({
           </div>
         )}
 
-        {/* Visibility badge — top right, absolute */}
-        <div className="absolute top-2.5 right-2.5 z-10">
+        {/* Top badge row: visibility (left) + bookmark (right) */}
+        <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between gap-2 pointer-events-none">
+          {/* Visibility badge */}
           <div
             className={cn(
               "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
@@ -122,10 +204,18 @@ export function MomentCard({
             )}
             {isPrivate ? "Private" : "Public"}
           </div>
+
+          {/* Bookmark button — pointer-events re-enabled */}
+          <div className="pointer-events-auto">
+            <CardBookmarkButton
+              momentId={moment.id}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Glass overlay at bottom — gradient fade from transparent to glass */}
+      {/* Card body */}
       <div className="relative px-3 pb-3 pt-2">
         {/* Gradient connector between image and content */}
         {coverUrl && (

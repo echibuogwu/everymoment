@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { createActorWithConfig } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -20,6 +21,7 @@ import {
   Globe,
   Images,
   Lock,
+  LogIn,
   MapPin,
   Megaphone,
   MessageSquareHeart,
@@ -332,7 +334,7 @@ function BookmarkButton({ momentId }: { momentId: string }) {
     } else {
       bookmarkMutation.mutate(momentId, {
         onSuccess: () => showSuccess("Moment saved"),
-        onError: () => showError("Failed to update bookmark"),
+        onError: () => showError("Failed to save moment"),
       });
     }
   };
@@ -344,15 +346,21 @@ function BookmarkButton({ momentId }: { momentId: string }) {
       type="button"
       onClick={handleToggle}
       disabled={isPending}
-      aria-label={isBookmarked ? "Remove bookmark" : "Bookmark moment"}
-      className="w-9 h-9 rounded-xl glass-card flex items-center justify-center transition-smooth button-spring disabled:opacity-50"
+      aria-label={isBookmarked ? "Remove bookmark" : "Save moment"}
+      className={cn(
+        "flex items-center gap-2 px-4 py-2.5 rounded-xl font-body font-semibold text-sm transition-smooth button-spring disabled:opacity-50",
+        isBookmarked
+          ? "bg-accent text-accent-foreground shadow-sm"
+          : "glass-card text-foreground hover:bg-accent/10 border border-border",
+      )}
       data-ocid="bookmark-toggle-button"
     >
       {isBookmarked ? (
-        <BookmarkCheck className="w-4 h-4 text-accent" />
+        <BookmarkCheck className="w-5 h-5" />
       ) : (
-        <Bookmark className="w-4 h-4 text-muted-foreground" />
+        <Bookmark className="w-5 h-5" />
       )}
+      <span>{isBookmarked ? "Saved" : "Save"}</span>
     </button>
   );
 }
@@ -418,62 +426,158 @@ function downloadIcs(moment: MomentDetail) {
   URL.revokeObjectURL(url);
 }
 
-function AddToCalendarButton({ moment }: { moment: MomentDetail }) {
-  const [open, setOpen] = useState(false);
+// ── Share Section ──────────────────────────────────────────────────────────────
+
+function ShareSection({
+  momentId,
+  moment,
+}: {
+  momentId: string;
+  moment: MomentDetail;
+}) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `${window.location.origin}/moments/${momentId}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // clipboard not available — silent fail
+    }
+  };
 
   return (
-    <div className="relative" data-ocid="add-to-calendar-section">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl glass-card border border-border text-sm font-body font-medium text-foreground hover:bg-accent/5 transition-smooth"
-        data-ocid="add-to-calendar-button"
-      >
-        <CalendarPlus className="w-4 h-4 text-accent" />
-        Add to Calendar
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
+    <div
+      className="rounded-2xl border border-border/50 overflow-hidden"
+      style={{
+        background: "color-mix(in oklch, var(--card) 60%, transparent)",
+        backdropFilter: "blur(12px)",
+      }}
+      data-ocid="share-section"
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-border/30">
+        <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center">
+          <Share2 className="w-3.5 h-3.5 text-accent" />
+        </div>
+        <h3 className="font-display font-semibold text-sm text-foreground">
+          Share this Moment
+        </h3>
+      </div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-0 right-0 mt-2 glass-card rounded-xl border border-border shadow-lg overflow-hidden z-30"
-            data-ocid="add-to-calendar-dropdown"
+      <div className="p-4 space-y-4">
+        {/* Copy link row — prominent */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            Link
+          </p>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 text-left font-body text-sm button-spring ${
+              copied
+                ? "border-accent/50 bg-accent/10 text-accent"
+                : "border-border bg-muted/30 text-foreground hover:bg-muted/50 hover:border-border/70"
+            }`}
+            data-ocid="copy-share-link-btn"
           >
+            {copied ? (
+              <Check className="w-4 h-4 text-accent flex-shrink-0" />
+            ) : (
+              <Copy className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            )}
+            <span className="flex-1 truncate text-muted-foreground text-xs">
+              {shareUrl}
+            </span>
+            <span
+              className={`text-xs font-semibold flex-shrink-0 ${copied ? "text-accent" : "text-foreground"}`}
+            >
+              {copied ? "Copied!" : "Copy"}
+            </span>
+          </button>
+        </div>
+
+        {/* QR Code — always visible */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            QR Code
+          </p>
+          <div
+            className="flex flex-col items-center gap-3 p-4 rounded-xl bg-background border border-border/40"
+            data-ocid="qr-code-container"
+          >
+            <div className="bg-white p-3 rounded-xl shadow-sm">
+              <QRCodeSVG
+                value={shareUrl}
+                size={144}
+                level="M"
+                includeMargin={false}
+                className="rounded"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground font-body text-center">
+              Scan to open this moment
+            </p>
+          </div>
+        </div>
+
+        {/* Add to Calendar — 3 distinct buttons */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            Add to Calendar
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {/* Google Calendar */}
             <button
               type="button"
               onClick={() => {
                 window.open(googleCalendarUrl(moment), "_blank");
-                setOpen(false);
               }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-body text-foreground hover:bg-accent/10 transition-colors"
+              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors text-center"
               data-ocid="calendar-google-button"
             >
-              <ExternalLink className="w-4 h-4 text-muted-foreground" />
-              Google Calendar
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#4285f4]/10">
+                <ExternalLink className="w-3.5 h-3.5 text-[#4285f4]" />
+              </div>
+              <span className="text-[10px] font-body font-medium text-muted-foreground leading-tight">
+                Google
+              </span>
             </button>
-            <div className="border-t border-border" />
+
+            {/* Apple Calendar (.ics) */}
             <button
               type="button"
-              onClick={() => {
-                downloadIcs(moment);
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-body text-foreground hover:bg-accent/10 transition-colors"
+              onClick={() => downloadIcs(moment)}
+              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors text-center"
+              data-ocid="calendar-apple-button"
+            >
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-foreground/10">
+                <Calendar className="w-3.5 h-3.5 text-foreground" />
+              </div>
+              <span className="text-[10px] font-body font-medium text-muted-foreground leading-tight">
+                Apple
+              </span>
+            </button>
+
+            {/* Download .ics */}
+            <button
+              type="button"
+              onClick={() => downloadIcs(moment)}
+              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors text-center"
               data-ocid="calendar-ics-button"
             >
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              Apple Calendar / Outlook (.ics)
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-accent/10">
+                <CalendarPlus className="w-3.5 h-3.5 text-accent" />
+              </div>
+              <span className="text-[10px] font-body font-medium text-muted-foreground leading-tight">
+                .ics File
+              </span>
             </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -528,110 +632,143 @@ function AgendaTimeline({ items }: { items: AgendaItem[] }) {
   );
 }
 
-// ── Share Section ──────────────────────────────────────────────────────────────
+// ── NullMomentAccessRequest ───────────────────────────────────────────────────
+// Shown when getMomentDetail returns null but getMomentAccessStatus confirms
+// the moment exists (it's private and user hasn't been approved yet).
 
-function ShareSection({
+function NullMomentAccessRequest({
   momentId,
-  moment,
+  currentStatus,
+  onAccessGranted,
 }: {
   momentId: string;
-  moment: MomentDetail;
+  currentStatus: AccessStatus | null;
+  onAccessGranted: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
-  const shareUrl = `${window.location.origin}/moment/${momentId}`;
+  const { actor } = useBackend();
+  const { isAuthenticated, login } = useAuth();
+  const [requestSent, setRequestSent] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard not available — silent fail
+  const requestMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Not connected");
+      const result = await actor.requestMomentAccess(momentId);
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
+    },
+    onSuccess: () => {
+      setRequestSent(true);
+      setInlineError(null);
+      onAccessGranted();
+    },
+    onError: (err: Error) => {
+      setInlineError(
+        err.message || "Failed to request access, please try again",
+      );
+    },
+  });
+
+  const handleRequest = () => {
+    if (!isAuthenticated) {
+      login();
+      return;
     }
+    setInlineError(null);
+    requestMutation.mutate();
   };
+
+  const isPending = currentStatus === AccessStatus.pending;
+  const isDenied =
+    currentStatus === AccessStatus.denied ||
+    currentStatus === AccessStatus.revoked;
 
   return (
     <div
-      className="glass-card rounded-2xl p-4 space-y-3"
-      data-ocid="share-section"
+      className="flex flex-col items-center text-center space-y-5"
+      data-ocid="private-moment-preview"
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Share2 className="w-4 h-4 text-muted-foreground" />
-          <h3 className="font-display font-semibold text-sm text-foreground">
-            Share this Moment
-          </h3>
-        </div>
-        <BookmarkButton momentId={momentId} />
+      <div className="w-16 h-16 rounded-full glass-card flex items-center justify-center glow-accent">
+        <Lock className="w-7 h-7 text-accent" />
+      </div>
+      <div className="space-y-1">
+        <p className="font-display font-bold text-xl text-foreground">
+          Private Moment
+        </p>
+        <p className="text-sm text-muted-foreground font-body">
+          This moment is private. Request access to view it.
+        </p>
       </div>
 
-      {/* Copy link */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleCopy}
-        className="w-full gap-2 transition-smooth button-spring"
-        data-ocid="copy-share-link-btn"
-      >
-        {copied ? (
-          <>
-            <Check className="w-4 h-4 text-foreground" />
-            <span className="font-body">Copied!</span>
-          </>
-        ) : (
-          <>
-            <Copy className="w-4 h-4" />
-            <span className="font-body">Copy Link</span>
-          </>
-        )}
-      </Button>
-
-      {/* Add to calendar */}
-      <AddToCalendarButton moment={moment} />
-
-      {/* QR toggle */}
-      <div className="space-y-2">
-        <button
-          type="button"
-          onClick={() => setQrOpen((v) => !v)}
-          className="tap-target w-full flex items-center justify-between px-3 py-2 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-smooth text-sm"
-          aria-expanded={qrOpen}
-          data-ocid="qr-toggle-btn"
-        >
-          <span className="flex items-center gap-2 font-body text-muted-foreground">
-            <QrCode className="w-4 h-4" />
-            {qrOpen ? "Hide QR Code" : "Show QR Code"}
-          </span>
-          {qrOpen ? (
-            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          )}
-        </button>
-
-        <AnimatePresence initial={false}>
-          {qrOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="overflow-hidden"
-              data-ocid="qr-code-container"
+      <div className="space-y-3 w-full max-w-xs">
+        {requestSent || isPending ? (
+          <div
+            className="glass-card rounded-2xl p-4 flex flex-col items-center gap-2"
+            data-ocid="access-pending-badge"
+          >
+            <Clock className="w-6 h-6 text-accent" />
+            <p className="text-sm font-body font-semibold text-foreground">
+              {requestSent
+                ? "Access request sent!"
+                : "Access Requested — Pending Approval"}
+            </p>
+            <p className="text-xs text-muted-foreground font-body">
+              The owner will review your request.
+            </p>
+          </div>
+        ) : isDenied ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground font-body">
+              {currentStatus === AccessStatus.revoked
+                ? "Your access has been revoked."
+                : "Your access request was denied."}
+            </p>
+            {inlineError && (
+              <p className="text-xs text-destructive font-body">
+                {inlineError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleRequest}
+              disabled={requestMutation.isPending}
+              data-ocid="re-request-access-btn"
+              className="w-full glass-card rounded-2xl px-5 py-3 text-sm font-body font-semibold text-foreground button-spring transition-smooth hover:opacity-80 disabled:opacity-50 min-h-12"
             >
-              <div className="flex justify-center p-4 bg-background rounded-xl border border-border">
-                <QRCodeSVG
-                  value={shareUrl}
-                  size={160}
-                  level="M"
-                  includeMargin={false}
-                  className="rounded"
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {requestMutation.isPending ? "Requesting…" : "Re-request Access"}
+            </button>
+          </div>
+        ) : !isAuthenticated ? (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={login}
+              data-ocid="sign-in-to-request-access-btn"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-body font-semibold text-accent-foreground bg-accent glow-accent button-spring transition-smooth hover:opacity-90 min-h-12"
+            >
+              <LogIn className="w-4 h-4" />
+              Sign in to Request Access
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {inlineError && (
+              <p className="text-xs text-destructive font-body">
+                {inlineError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleRequest}
+              disabled={requestMutation.isPending}
+              data-ocid="request-access-btn"
+              className="w-full flex items-center justify-center rounded-2xl px-5 py-3.5 text-sm font-body font-semibold text-accent-foreground bg-accent glow-accent button-spring transition-smooth hover:opacity-90 disabled:opacity-50 min-h-12"
+            >
+              {requestMutation.isPending ? "Requesting…" : "Request Access"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -727,6 +864,7 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
   const { actor, isFetching } = useBackend();
   const { isAuthenticated, principal } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showEventPass, setShowEventPass] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("memories");
 
@@ -741,6 +879,21 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
     enabled: true,
   });
 
+  // When getMomentDetail returns null (private moment with no access), check the access status
+  // to distinguish "private moment — request access" from "truly not found"
+  const { data: accessStatus, isLoading: accessStatusLoading } =
+    useQuery<AccessStatus | null>({
+      queryKey: ["momentAccessStatus", momentId],
+      queryFn: async () => {
+        const effectiveActor = actor
+          ? actor
+          : await createActorWithConfig(createActor);
+        return effectiveActor.getMomentAccessStatus(momentId);
+      },
+      // Run this check whenever moment is null — we need to know why
+      enabled: !isLoading && moment === null,
+    });
+
   const { data: attendees } = useQuery<Attendee[]>({
     queryKey: QUERY_KEYS.momentAttendees(momentId),
     queryFn: async () => {
@@ -751,11 +904,27 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
   });
 
   const isPrivate = isPrivateVisibility(moment?.visibility);
+
+  /**
+   * Robust access check — handles all Candid variant forms for AccessStatus:
+   *   - AccessStatus.approved string enum ("approved")
+   *   - {approved: null}  raw Candid variant object
+   * A null moment means data is still loading or was truly not found (handled separately).
+   */
+  function isApprovedStatus(
+    s: MomentDetail["callerAccessStatus"] | undefined,
+  ): boolean {
+    if (!s) return false;
+    if (s === AccessStatus.approved) return true;
+    if (typeof s === "object" && s !== null && "approved" in s) return true;
+    return false;
+  }
+
   const hasAccess =
     !moment ||
     !isPrivate ||
     moment.isOwner ||
-    moment.callerAccessStatus === AccessStatus.approved;
+    isApprovedStatus(moment.callerAccessStatus);
   const showAccessTab = moment?.isOwner && isPrivate;
   const coverUrl = moment?.coverImage?.getDirectURL();
 
@@ -813,9 +982,11 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
   return (
     <AuthGuard requireAuth={false} currentPath={`/moments/${momentId}`}>
       <Layout>
-        {isLoading ? (
+        {isLoading ||
+        (moment === null && accessStatusLoading) ||
+        (moment === null && accessStatus === AccessStatus.approved) ? (
           <MomentDetailSkeleton />
-        ) : !moment ? (
+        ) : !moment && accessStatus === null && !accessStatusLoading ? (
           <div className="py-6 px-4">
             <EmptyState
               title="Moment not found"
@@ -831,6 +1002,35 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
               }
             />
           </div>
+        ) : !moment &&
+          accessStatus !== undefined &&
+          accessStatus !== AccessStatus.approved ? (
+          // Private moment — user has no access yet (or status is pending/denied/revoked)
+          // NOTE: if accessStatus is 'approved', we fall through to MomentDetailSkeleton
+          // (moment data is loading) rather than wrongly showing the request screen
+          <div className="py-4 px-4">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="tap-target flex items-center gap-2 text-muted-foreground hover:text-foreground transition-smooth mb-4 -ml-1"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm font-body">Back</span>
+            </button>
+            <NullMomentAccessRequest
+              momentId={momentId}
+              currentStatus={accessStatus}
+              onAccessGranted={() => {
+                queryClient.invalidateQueries({
+                  queryKey: QUERY_KEYS.momentDetail(momentId),
+                });
+                queryClient.invalidateQueries({
+                  queryKey: ["momentAccessStatus", momentId],
+                });
+              }}
+            />
+          </div>
         ) : !hasAccess ? (
           <div className="py-4 px-4">
             <button
@@ -842,9 +1042,9 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
               <ArrowLeft className="w-4 h-4" />
               <span className="text-sm font-body">Back</span>
             </button>
-            <PrivateMomentPreview moment={moment} />
+            <PrivateMomentPreview moment={moment!} />
           </div>
-        ) : (
+        ) : moment ? (
           <div className="pb-10">
             {/* Hero */}
             <div className="relative -mx-4 md:-mx-6">
@@ -971,24 +1171,35 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
                 {moment.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {moment.tags.map((tag) => (
-                      <Badge
+                      <button
                         key={tag}
-                        variant="secondary"
-                        className="text-xs font-body"
+                        type="button"
+                        onClick={() => {
+                          window.location.href = `/explore?tag=${encodeURIComponent(tag)}`;
+                        }}
+                        data-ocid={`moment_detail.tag.${tag}`}
+                        aria-label={`Filter by tag ${tag}`}
+                        className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
                       >
-                        #{tag}
-                      </Badge>
+                        <Badge
+                          variant="secondary"
+                          className="text-xs font-body cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors duration-200 pointer-events-none"
+                        >
+                          #{tag}
+                        </Badge>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* RSVP */}
-              <div>
-                <p className="text-xs text-muted-foreground font-body mb-2 uppercase tracking-wide">
+              {/* RSVP + Bookmark row */}
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground font-body uppercase tracking-wide">
                   Your RSVP
                 </p>
                 <RsvpButton momentId={momentId} />
+                <BookmarkButton momentId={momentId} />
               </div>
 
               {/* Event Pass — attending only */}
@@ -1077,7 +1288,7 @@ export function MomentDetailContent({ momentId }: { momentId: string }) {
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </Layout>
 
       {showEventPass && (

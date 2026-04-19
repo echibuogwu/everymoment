@@ -15,5 +15,13 @@ module {
     userId : Common.UserId;
     lastMessage : Message;
     unreadCount : Nat;
+    // true = this conversation came from a non-follower (message request inbox)
+    isMessageRequest : Bool;
+  };
+
+  // Split inbox result
+  public type ConversationInboxResult = {
+    accepted : [ConversationSummary];
+    requests : [ConversationSummary];
   };
 };

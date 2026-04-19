@@ -18,6 +18,7 @@ export interface CreateMomentInput {
     locationLat?: number;
     locationLng?: number;
     title: string;
+    endDate?: Timestamp;
     maxAttendees?: bigint;
     tags: Array<string>;
     agendaItems: Array<{
@@ -56,6 +57,7 @@ export interface MomentListItem {
     locationLng?: number;
     title: string;
     attendeeCount: bigint;
+    endDate?: Timestamp;
     owner: UserId;
     maxAttendees?: bigint;
     createdAt: Timestamp;
@@ -106,15 +108,18 @@ export interface Media {
     folderId: FolderId;
     uploadedBy: UserId;
 }
-export interface ConversationSummary {
-    userId: UserId;
-    lastMessage: Message;
-    unreadCount: bigint;
+export interface FollowRequest {
+    id: string;
+    status: FollowRequestStatus;
+    createdAt: Timestamp;
+    toId: UserId;
+    fromId: UserId;
 }
 export interface UpdateMomentInput {
     locationLat?: number;
     locationLng?: number;
     title: string;
+    endDate?: Timestamp;
     maxAttendees?: bigint;
     tags: Array<string>;
     agendaItems: Array<{
@@ -139,6 +144,12 @@ export interface SaveProfileInput {
     photo?: ExternalBlob;
     location?: string;
 }
+export interface ConversationSummary {
+    userId: UserId;
+    lastMessage: Message;
+    isMessageRequest: boolean;
+    unreadCount: bigint;
+}
 export type CommentId = bigint;
 export interface Comment {
     id: CommentId;
@@ -158,13 +169,6 @@ export type CallerRelation = {
     __kind__: "following";
     following: null;
 };
-export interface AttendanceInfo {
-    status: string;
-    rsvpTime: Timestamp;
-    momentDate: Timestamp;
-    username: string;
-    momentTitle: string;
-}
 export interface MemoryWithAuthor {
     id: MemoryId;
     authorUsername: string;
@@ -191,11 +195,12 @@ export interface CreateFolderInput {
     name: string;
     momentId: MomentId;
 }
-export interface AgendaItem {
-    id: bigint;
-    title: string;
-    time: string;
-    description?: string;
+export interface AttendanceInfo {
+    status: string;
+    rsvpTime: Timestamp;
+    momentDate: Timestamp;
+    username: string;
+    momentTitle: string;
 }
 export interface UserProfilePublic {
     id: UserId;
@@ -211,12 +216,14 @@ export interface UserProfilePublic {
     attendedCount: bigint;
     followingCount: bigint;
     photo?: ExternalBlob;
+    isPrivateHidden: boolean;
     location?: string;
 }
-export interface AddCommentInput {
-    text: string;
-    parentId?: CommentId;
-    mediaId: MediaId;
+export interface AgendaItem {
+    id: bigint;
+    title: string;
+    time: string;
+    description?: string;
 }
 export interface Announcement {
     id: bigint;
@@ -239,12 +246,17 @@ export interface RecurrenceRule {
     daysOfWeek: Array<bigint>;
     frequency: RecurrenceFrequency;
 }
+export interface ConversationInboxResult {
+    requests: Array<ConversationSummary>;
+    accepted: Array<ConversationSummary>;
+}
 export interface MomentDetail {
     id: MomentId;
     locationLat?: number;
     locationLng?: number;
     title: string;
     attendeeCount: bigint;
+    endDate?: Timestamp;
     callerAccessStatus?: AccessStatus;
     owner: UserId;
     maxAttendees?: bigint;
@@ -302,6 +314,11 @@ export interface BulkImportMomentRow {
     startDate: Timestamp;
 }
 export type MomentId = string;
+export interface AddCommentInput {
+    text: string;
+    parentId?: CommentId;
+    mediaId: MediaId;
+}
 export type MediaId = bigint;
 export type FolderId = bigint;
 export enum AccessStatus {
@@ -314,6 +331,11 @@ export enum ActivityKind {
     rsvpdToMoment = "rsvpdToMoment",
     createdMoment = "createdMoment",
     followedUser = "followedUser"
+}
+export enum FollowRequestStatus {
+    pending = "pending",
+    rejected = "rejected",
+    accepted = "accepted"
 }
 export enum MediaKind {
     audio = "audio",
@@ -355,6 +377,8 @@ export enum Visibility {
     private_ = "private"
 }
 export interface backendInterface {
+    acceptFollowRequest(requestId: string): Promise<void>;
+    acceptMessageRequest(fromId: UserId): Promise<void>;
     addComment(input: AddCommentInput): Promise<CommentId>;
     adminBulkImportMoments(rows: Array<BulkImportMomentRow>): Promise<BulkImportResult>;
     adminDeleteAllMoments(): Promise<void>;
@@ -366,6 +390,7 @@ export interface backendInterface {
     adminListUsers(): Promise<Array<UserProfilePublic>>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     bookmarkMoment(momentId: MomentId): Promise<void>;
+    cancelFollowRequest(requestId: string): Promise<void>;
     createFolder(input: CreateFolderInput): Promise<FolderId>;
     createMoment(input: CreateMomentInput): Promise<MomentId>;
     deleteAnnouncement(momentId: MomentId, announcementId: bigint): Promise<void>;
@@ -379,8 +404,9 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    deleteMessageRequest(fromId: UserId): Promise<void>;
     deleteMoment(momentId: MomentId): Promise<void>;
-    followUser(target: UserId): Promise<void>;
+    followUser(target: UserId): Promise<boolean>;
     getActivityFeed(): Promise<Array<ActivityEvent>>;
     getAnnouncementsForMoment(momentId: MomentId): Promise<Array<Announcement>>;
     getCallerUserProfile(): Promise<UserProfilePublic | null>;
@@ -394,6 +420,7 @@ export interface backendInterface {
         err: string;
     }>;
     getFeedMoments(): Promise<Array<MomentListItem>>;
+    getFollowRequestStatus(targetId: UserId): Promise<FollowRequest | null>;
     getFollowers(userId: UserId): Promise<Array<UserProfilePublic>>;
     getFollowing(userId: UserId): Promise<Array<UserProfilePublic>>;
     getMedia(mediaId: MediaId): Promise<Media | null>;
@@ -415,9 +442,10 @@ export interface backendInterface {
     getMyAttendanceInfo(momentId: MomentId): Promise<AttendanceInfo | null>;
     getMyBookmarks(): Promise<Array<MomentId>>;
     getMyCalendarMoments(rangeStart: Timestamp, rangeEnd: Timestamp): Promise<Array<MomentListItem>>;
-    getMyConversations(): Promise<Array<ConversationSummary>>;
+    getMyConversations(): Promise<ConversationInboxResult>;
     getMyMoments(): Promise<Array<MomentListItem>>;
     getMyNotifications(): Promise<Array<Notification>>;
+    getPendingFollowRequests(): Promise<Array<FollowRequest>>;
     getUnreadMessageCount(): Promise<bigint>;
     getUnreadNotificationCount(): Promise<bigint>;
     getUserProfile(userId: UserId): Promise<UserProfilePublic | null>;
@@ -443,6 +471,7 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    rejectFollowRequest(requestId: string): Promise<void>;
     requestMomentAccess(momentId: MomentId): Promise<{
         __kind__: "ok";
         ok: null;
@@ -454,6 +483,7 @@ export interface backendInterface {
     revokeMomentAccess(momentId: MomentId, userId: UserId): Promise<void>;
     saveCallerUserProfile(input: SaveProfileInput): Promise<void>;
     searchMoments(searchText: string | null, tags: Array<string>, dateRangeStart: Timestamp | null, dateRangeEnd: Timestamp | null, locationLat: number | null, locationLng: number | null, radiusKm: number | null, offset: bigint, limit: bigint): Promise<Array<MomentListItem>>;
+    searchUsers(prefix: string, limit: bigint): Promise<Array<UserProfilePublic>>;
     sendMessage(recipientId: UserId, text: string): Promise<bigint>;
     setRsvp(momentId: MomentId, status: RsvpStatus): Promise<void>;
     toggleLike(mediaId: MediaId): Promise<bigint>;

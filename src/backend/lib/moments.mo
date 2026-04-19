@@ -125,6 +125,7 @@ module {
       locationLat = m.locationLat;
       locationLng = m.locationLng;
       eventDate = m.eventDate;
+      endDate = m.endDate;
       tags = m.tags;
       coverImage = m.coverImage;
       visibility = m.visibility;
@@ -245,6 +246,7 @@ module {
       locationLat = input.locationLat;
       locationLng = input.locationLng;
       eventDate = input.eventDate;
+      endDate = input.endDate;
       tags = input.tags;
       coverImage = input.coverImage;
       visibility = input.visibility;
@@ -306,6 +308,7 @@ module {
           locationLat = input.locationLat;
           locationLng = input.locationLng;
           eventDate = input.eventDate;
+          endDate = input.endDate;
           tags = input.tags;
           coverImage = input.coverImage;
           visibility = input.visibility;
@@ -532,6 +535,32 @@ module {
     results.sliceToArray(offset, end);
   };
 
+  // listMyMoments: returns all moments the caller owns PLUS private moments where
+  // the caller has been approved for access. This is used by getMyMoments so that
+  // approved private-moment attendees see those moments in their list.
+  public func listMyMoments(state : MomentsState, caller : Common.UserId) : [T.MomentListItem] {
+    let results = List.empty<T.MomentListItem>();
+    state.moments.forEach(func(_, m) {
+      if (Principal.equal(m.owner, caller)) {
+        // Caller owns this moment — always include
+        results.add(_toListItem(state, m, null, null));
+      } else if (m.visibility == #private_) {
+        // Private moment: include only if caller has been granted access
+        let hasAccess = switch (state.grantedAccess.get(m.id)) {
+          case (?s) s.contains(caller);
+          case null false;
+        };
+        if (hasAccess) {
+          results.add(_toListItem(state, m, null, null));
+        };
+      };
+    });
+    results.sortInPlace(func(a : T.MomentListItem, b : T.MomentListItem) : { #less; #equal; #greater } {
+      Int.compare(b.eventDate, a.eventDate)
+    });
+    results.toArray();
+  };
+
   // Returns moments owned by userId.
   // If caller == userId (owner viewing their own profile), all moments are returned (public + private).
   // If caller != userId (someone else viewing a profile), only public moments are returned.
@@ -650,7 +679,37 @@ module {
             case (?s) s.contains(caller);
             case null false;
           };
-          if (not access) return null;
+          if (not access) {
+            // Return a limited preview record so the frontend can show the
+            // access-request flow instead of treating this as a 404.
+            let callerStatus : ?T.AccessStatus = switch (state.accessRequests.get(_pairCompare, (momentId, caller))) {
+              case (?req) ?req.status;
+              case null null; // no prior request — caller can request access
+            };
+            return ?{
+              id = m.id;
+              owner = m.owner;
+              title = m.title;
+              description = "";
+              location = "";
+              locationLat = null;
+              locationLng = null;
+              eventDate = m.eventDate;
+              endDate = null;
+              tags = [];
+              coverImage = m.coverImage;
+              visibility = m.visibility;
+              createdAt = m.createdAt;
+              updatedAt = m.updatedAt;
+              attendeeCount = 0;
+              callerAccessStatus = callerStatus;
+              isOwner = false;
+              recurrence = null;
+              maxAttendees = null;
+              waitlistCount = 0;
+              agendaItems = [];
+            };
+          };
         };
 
         let callerAccessStatus : ?T.AccessStatus = if (isOwner) {
@@ -671,6 +730,7 @@ module {
           locationLat = m.locationLat;
           locationLng = m.locationLng;
           eventDate = m.eventDate;
+          endDate = m.endDate;
           tags = m.tags;
           coverImage = m.coverImage;
           visibility = m.visibility;
@@ -686,6 +746,31 @@ module {
         };
       };
     };
+  };
+
+  // ── Profile stats helpers ─────────────────────────────────────────────────
+
+  // Count moments owned by a user (hosted count)
+  public func countHostedByUser(state : MomentsState, userId : Common.UserId) : Nat {
+    var count = 0;
+    state.moments.forEach(func(_, m) {
+      if (Principal.equal(m.owner, userId)) count += 1;
+    });
+    count;
+  };
+
+  // Count moments a user is attending (rsvpStatus == #attending)
+  public func countAttendedByUser(state : MomentsState, userId : Common.UserId) : Nat {
+    var count = 0;
+    state.attendees.forEach(func(key, att) {
+      let (_, attendeeId) = key;
+      if (Principal.equal(attendeeId, userId) and att.rsvpStatus == #attending) {
+        count += 1;
+      };
+    });
+    // Subtract 1 for each moment they own (owner is auto-added as attending, counted in hosted)
+    // Actually keep both counts independent: hosted = created, attended = all attending entries
+    count;
   };
 
   // ── Access control ────────────────────────────────────────────────────────
@@ -890,7 +975,10 @@ module {
 
   // Returns the ordered waitlist for a moment (userId array, first = next to be promoted)
   public func getMomentWaitlist(state : MomentsState, momentId : Common.MomentId) : [Common.UserId] {
-    Runtime.trap("not implemented");
+    switch (state.waitlists.get(momentId)) {
+      case (?wl) wl.toArray();
+      case null [];
+    };
   };
 
   public func getAttendanceInfo(state : MomentsState, usersState : UsersLib.UsersState, userId : Common.UserId, momentId : Common.MomentId) : ?T.AttendanceInfo {
@@ -973,6 +1061,7 @@ module {
           locationLat = row.locationLat;
           locationLng = row.locationLng;
           eventDate = row.startDate;
+          endDate = row.endDate;
           tags = row.tags;
           coverImage = coverImageBlob;
           visibility;

@@ -49,6 +49,8 @@ module {
     hideAttendingList : Bool;
     hostedCount : Nat;
     attendedCount : Nat;
+    // When viewed by a non-follower of a private profile, details are hidden
+    isPrivateHidden : Bool;
   };
 
   public type SaveProfileInput = {
@@ -60,5 +62,17 @@ module {
     paymentDetails : ?[PaymentDetail];
     isPrivateProfile : Bool;
     hideAttendingList : Bool;
+  };
+
+  // ── Follow requests (for private profiles) ────────────────────────────────
+
+  public type FollowRequestStatus = { #pending; #accepted; #rejected };
+
+  public type FollowRequest = {
+    id : Text;
+    fromId : Common.UserId;
+    toId : Common.UserId;
+    status : FollowRequestStatus;
+    createdAt : Common.Timestamp;
   };
 };

@@ -115,7 +115,7 @@ export const mockBackend: backendInterface = {
   adminDeleteUser: async () => undefined,
   adminListMedia: async () => sampleMedia,
   adminListMoments: async () => sampleMoments,
-  adminListUsers: async () => [
+   adminListUsers: async () => [
     {
       id: mockPrincipal,
       username: "alex_memories",
@@ -125,6 +125,7 @@ export const mockBackend: backendInterface = {
       photo: undefined,
       hideAttendingList: false,
       isPrivateProfile: false,
+      isPrivateHidden: false,
       hostedCount: BigInt(5),
       attendedCount: BigInt(12),
     },
@@ -137,6 +138,7 @@ export const mockBackend: backendInterface = {
       photo: undefined,
       hideAttendingList: false,
       isPrivateProfile: false,
+      isPrivateHidden: false,
       hostedCount: BigInt(8),
       attendedCount: BigInt(24),
     },
@@ -149,7 +151,7 @@ export const mockBackend: backendInterface = {
   deleteMedia: async () => undefined,
   deleteMemory: async () => ({ __kind__: "ok" as const, ok: null }),
   deleteMoment: async () => undefined,
-  followUser: async () => undefined,
+  followUser: async () => false,
   getCallerUserProfile: async () => ({
     id: mockPrincipal,
     username: "alex_memories",
@@ -169,6 +171,7 @@ export const mockBackend: backendInterface = {
     ],
     hideAttendingList: false,
     isPrivateProfile: false,
+    isPrivateHidden: false,
     hostedCount: BigInt(5),
     attendedCount: BigInt(12),
   }),
@@ -265,6 +268,7 @@ export const mockBackend: backendInterface = {
     photo: undefined,
     hideAttendingList: false,
     isPrivateProfile: false,
+    isPrivateHidden: false,
     hostedCount: BigInt(8),
     attendedCount: BigInt(24),
   }),
@@ -277,6 +281,7 @@ export const mockBackend: backendInterface = {
     photo: undefined,
     hideAttendingList: false,
     isPrivateProfile: false,
+    isPrivateHidden: false,
     hostedCount: BigInt(8),
     attendedCount: BigInt(24),
   }),
@@ -370,20 +375,24 @@ export const mockBackend: backendInterface = {
   getUnreadNotificationCount: async () => BigInt(2),
   markNotificationRead: async () => undefined,
   markAllNotificationsRead: async () => undefined,
-  getMyConversations: async () => [
-    {
-      userId: mockPrincipal2,
-      lastMessage: {
-        id: BigInt(1),
-        createdAt: now - BigInt(10 * 60 * 1_000_000_000),
-        text: "See you at the wedding!",
-        isRead: false,
-        recipientId: mockPrincipal,
-        senderId: mockPrincipal2,
+  getMyConversations: async () => ({
+    accepted: [
+      {
+        userId: mockPrincipal2,
+        isMessageRequest: false,
+        lastMessage: {
+          id: BigInt(1),
+          createdAt: now - BigInt(10 * 60 * 1_000_000_000),
+          text: "See you at the wedding!",
+          isRead: false,
+          recipientId: mockPrincipal,
+          senderId: mockPrincipal2,
+        },
+        unreadCount: BigInt(2),
       },
-      unreadCount: BigInt(2),
-    },
-  ],
+    ],
+    requests: [],
+  }),
   getConversation: async () => [
     {
       id: BigInt(1),
@@ -440,4 +449,13 @@ export const mockBackend: backendInterface = {
       targetUserId: mockPrincipal,
     },
   ],
+  // Follow request methods (private profiles)
+  acceptFollowRequest: async () => undefined,
+  acceptMessageRequest: async () => undefined,
+  cancelFollowRequest: async () => undefined,
+  deleteMessageRequest: async () => undefined,
+  getFollowRequestStatus: async () => null,
+  getPendingFollowRequests: async () => [],
+  rejectFollowRequest: async () => undefined,
+  searchUsers: async () => [],
 };

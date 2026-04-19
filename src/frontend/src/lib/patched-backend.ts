@@ -32,6 +32,16 @@ import type {
   UserId,
 } from "../types";
 
+// Extended input types that include the optional endDate field
+// (not yet in backend.d.ts but sent as raw Candid to the backend)
+export interface CreateMomentInputWithEndDate extends CreateMomentInput {
+  endDate?: bigint;
+}
+
+export interface UpdateMomentInputWithEndDate extends UpdateMomentInput {
+  endDate?: bigint;
+}
+
 // ─── Visibility helpers ────────────────────────────────────────────────────────
 
 /** Convert a Visibility enum value to the correct Candid wire format */
@@ -111,7 +121,7 @@ export function applyBackendPatches() {
   const origUpdate = Backend.prototype.updateMoment;
 
   Backend.prototype.createMoment = async function (
-    input: CreateMomentInput,
+    input: CreateMomentInputWithEndDate,
   ): Promise<MomentId> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const self = this as any;
@@ -139,12 +149,28 @@ export function applyBackendPatches() {
       locationLat: input.locationLat !== undefined ? [input.locationLat] : [],
       locationLng: input.locationLng !== undefined ? [input.locationLng] : [],
       recurrence: encodeOptRecurrence(input.recurrence),
+      maxAttendees:
+        input.maxAttendees !== undefined && input.maxAttendees !== null
+          ? [input.maxAttendees]
+          : [],
+      endDate:
+        input.endDate !== undefined && input.endDate !== null
+          ? [input.endDate]
+          : [],
+      agendaItems: (input.agendaItems ?? []).map((item) => ({
+        title: item.title,
+        time: item.time,
+        description:
+          item.description !== undefined && item.description !== ""
+            ? [item.description]
+            : [],
+      })),
     });
   };
 
   Backend.prototype.updateMoment = async function (
     momentId: MomentId,
-    input: UpdateMomentInput,
+    input: UpdateMomentInputWithEndDate,
   ): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const self = this as any;
@@ -172,6 +198,22 @@ export function applyBackendPatches() {
       locationLat: input.locationLat !== undefined ? [input.locationLat] : [],
       locationLng: input.locationLng !== undefined ? [input.locationLng] : [],
       recurrence: encodeOptRecurrence(input.recurrence),
+      maxAttendees:
+        input.maxAttendees !== undefined && input.maxAttendees !== null
+          ? [input.maxAttendees]
+          : [],
+      endDate:
+        input.endDate !== undefined && input.endDate !== null
+          ? [input.endDate]
+          : [],
+      agendaItems: (input.agendaItems ?? []).map((item) => ({
+        title: item.title,
+        time: item.time,
+        description:
+          item.description !== undefined && item.description !== ""
+            ? [item.description]
+            : [],
+      })),
     });
   };
 

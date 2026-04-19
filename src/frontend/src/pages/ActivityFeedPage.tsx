@@ -1,8 +1,14 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Activity, CalendarPlus, Star, UserPlus } from "lucide-react";
+import {
+  Activity,
+  CalendarPlus,
+  RefreshCw,
+  Star,
+  UserPlus,
+} from "lucide-react";
 import { Layout } from "../components/Layout";
 import { useAuth } from "../hooks/use-auth";
 import { useActivityFeed, useBackend } from "../hooks/use-backend";
@@ -60,10 +66,8 @@ function useUserDisplay(userId: string | undefined): {
     queryFn: async () => {
       if (!actor || !userId) return null;
       try {
-        const principal = { toString: () => userId } as Parameters<
-          typeof actor.getUserProfile
-        >[0];
-        return actor.getUserProfile(principal);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return actor.getUserProfile({ toString: () => userId } as any);
       } catch {
         return null;
       }
@@ -78,6 +82,21 @@ function useUserDisplay(userId: string | undefined): {
     : (profile?.name ??
       (userId.length > 14 ? `${userId.slice(0, 12)}…` : userId));
   return { label, username };
+}
+
+/** Look up a moment's title for display in feed items */
+function useMomentTitle(momentId: string | undefined): string {
+  const { actor } = useBackend();
+  const { data: moment } = useQuery({
+    queryKey: QUERY_KEYS.momentDetail(momentId ?? ""),
+    queryFn: async () => {
+      if (!actor || !momentId) return null;
+      return actor.getMomentDetail(momentId);
+    },
+    enabled: !!actor && !!momentId,
+    staleTime: 5 * 60_000,
+  });
+  return moment?.title ?? "a moment";
 }
 
 function ActivityItem({
@@ -99,6 +118,9 @@ function ActivityItem({
     useUserDisplay(actorId);
   const { label: targetLabel, username: targetUsername } = useUserDisplay(
     event.kind === ActivityKind.followedUser ? targetId : undefined,
+  );
+  const momentTitle = useMomentTitle(
+    event.kind !== ActivityKind.followedUser ? event.momentId : undefined,
   );
   const actorInitials = actorLabel.replace("@", "").slice(0, 2).toUpperCase();
 
@@ -131,7 +153,7 @@ function ActivityItem({
             <span className="font-semibold text-foreground">{actorLabel}</span>
           )}{" "}
           <span className={meta.color}>{meta.verb}</span>
-          {/* Moment link */}
+          {/* Moment link with title */}
           {event.momentId && event.kind !== ActivityKind.followedUser && (
             <>
               {" "}
@@ -141,7 +163,7 @@ function ActivityItem({
                 className="font-medium text-foreground hover:text-accent hover:underline transition-colors"
                 data-ocid={`activity.moment_link.${index + 1}`}
               >
-                a moment
+                {momentTitle}
               </Link>
             </>
           )}
@@ -185,7 +207,12 @@ function ActivityItem({
 
 export function ActivityFeedPage() {
   const { isAuthenticated } = useAuth();
-  const { data: events = [], isLoading } = useActivityFeed();
+  const queryClient = useQueryClient();
+  const { data: events = [], isLoading, isFetching } = useActivityFeed();
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.activityFeed });
+  };
 
   if (!isAuthenticated) {
     return (
@@ -216,13 +243,27 @@ export function ActivityFeedPage() {
     <Layout>
       <div className="pt-6" data-ocid="activity.page">
         {/* Header */}
-        <div className="mb-5">
-          <h1 className="text-xl font-display font-bold text-foreground">
-            Activity
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            What people you follow are up to
-          </p>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h1 className="text-xl font-display font-bold text-foreground">
+              Activity
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              What people you follow are up to
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="w-9 h-9 rounded-full glass-card flex items-center justify-center hover:ring-1 hover:ring-accent/40 transition-smooth disabled:opacity-50"
+            aria-label="Refresh activity feed"
+            data-ocid="activity.refresh_button"
+          >
+            <RefreshCw
+              className={`w-4 h-4 text-foreground ${isFetching ? "animate-spin" : ""}`}
+            />
+          </button>
         </div>
 
         {/* Feed */}

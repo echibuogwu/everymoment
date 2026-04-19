@@ -32,6 +32,7 @@ import { Layout } from "../components/Layout";
 import { LocationInput } from "../components/LocationInput";
 import { isPrivateVisibility } from "../components/MomentCard";
 import { useBackend } from "../hooks/use-backend";
+import type { UpdateMomentInputWithEndDate } from "../lib/patched-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { showError, showSuccess } from "../lib/toast";
 import type { AgendaItem, MomentDetail, RecurrenceRule } from "../types";
@@ -314,6 +315,7 @@ export function EditMomentPage() {
   const [existingCoverBlob, setExistingCoverBlob] =
     useState<ExternalBlob | null>(null);
   const [maxAttendees, setMaxAttendees] = useState<string>("");
+  const [momentEndDate, setMomentEndDate] = useState("");
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
@@ -369,6 +371,12 @@ export function EditMomentPage() {
       if (moment.agendaItems.length > 0) {
         setAgendaItems(agendaFromBackend(moment.agendaItems));
         setAgendaNextKey(moment.agendaItems.length + 100);
+      }
+      // End date (if backend returns it)
+      const endDateRaw = (moment as MomentDetail & { endDate?: bigint })
+        .endDate;
+      if (endDateRaw) {
+        setMomentEndDate(tsToDateStr(endDateRaw));
       }
       // Recurrence
       if (moment.recurrence) {
@@ -465,7 +473,17 @@ export function EditMomentPage() {
       const parsedMax =
         maxAttendees.trim() !== "" ? BigInt(maxAttendees) : undefined;
 
-      await actor.updateMoment(momentId, {
+      const parsedEndDate =
+        momentEndDate.trim() !== ""
+          ? BigInt(new Date(momentEndDate).getTime()) * 1_000_000n
+          : undefined;
+
+      await (
+        actor.updateMoment as (
+          id: string,
+          input: UpdateMomentInputWithEndDate,
+        ) => Promise<void>
+      )(momentId, {
         title: title.trim(),
         description: description.trim(),
         location: location.trim(),
@@ -477,12 +495,13 @@ export function EditMomentPage() {
         coverImage,
         recurrence,
         maxAttendees: parsedMax,
+        endDate: parsedEndDate,
         agendaItems: agendaItems
           .filter((i) => i.title.trim())
           .map((i) => ({
             title: i.title.trim(),
             time: i.time.trim(),
-            description: i.description.trim() || undefined,
+            description: i.description?.trim() || undefined,
           })),
       });
     },
@@ -727,7 +746,7 @@ export function EditMomentPage() {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <p className="text-xs text-muted-foreground font-body mb-1.5">
-                                Date *
+                                Start Date *
                               </p>
                               <input
                                 type="date"
@@ -750,6 +769,23 @@ export function EditMomentPage() {
                                 data-ocid="edit-moment-time"
                               />
                             </div>
+                          </div>
+                          {/* End Date */}
+                          <div className="mt-3">
+                            <p className="text-xs text-muted-foreground font-body mb-1.5">
+                              End Date (optional)
+                            </p>
+                            <input
+                              type="date"
+                              value={momentEndDate}
+                              min={date}
+                              onChange={(e) => setMomentEndDate(e.target.value)}
+                              className={glassInput}
+                              data-ocid="edit-moment-end-date-field"
+                            />
+                            <p className="text-xs text-muted-foreground font-body mt-1">
+                              For multi-day events. Leave blank if single-day.
+                            </p>
                           </div>
                         </div>
 

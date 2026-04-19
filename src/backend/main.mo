@@ -1,6 +1,7 @@
 import AccessControl "mo:caffeineai-authorization/access-control";
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import MixinObjectStorage "mo:caffeineai-object-storage/Mixin";
+import Migration "migration";
 import UsersLib "lib/users";
 import MomentsLib "lib/moments";
 import MediaLib "lib/media";
@@ -17,7 +18,8 @@ import AnnouncementsMixin "mixins/announcements-api";
 import NotificationsMixin "mixins/notifications-api";
 import MessagingMixin "mixins/messaging-api";
 import ActivityMixin "mixins/activity-api";
-import Migration "migration";
+
+
 
 (with migration = Migration.run)
 actor {
@@ -37,12 +39,12 @@ actor {
   let activityState = ActivityLib.initState();
 
   // ── Domain API mixins ─────────────────────────────────────────────────────
-  include UsersMixin(accessControlState, usersState);
-  include MomentsMixin(accessControlState, momentsState, mediaState, usersState);
+  include UsersMixin(accessControlState, usersState, momentsState, notificationsState, activityState);
+  include MomentsMixin(accessControlState, momentsState, mediaState, usersState, notificationsState, activityState);
   include MediaMixin(accessControlState, momentsState, mediaState);
   include MemoriesMixin(accessControlState, momentsState, memoriesState, usersState);
   include AnnouncementsMixin(accessControlState, momentsState, announcementsState);
   include NotificationsMixin(accessControlState, notificationsState);
-  include MessagingMixin(accessControlState, messagingState, notificationsState);
-  include ActivityMixin(accessControlState, activityState, usersState);
+  include MessagingMixin(accessControlState, messagingState, notificationsState, usersState);
+  include ActivityMixin(activityState, usersState);
 };

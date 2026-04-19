@@ -152,7 +152,10 @@ export function ExplorePage() {
   const urlParams = getUrlParams();
 
   // ── Filter state ───────────────────────────────────────────────────────────
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Auto-open filter panel if URL has active tag/date filters on mount
+  const [filtersOpen, setFiltersOpen] = useState(
+    urlParams.tags.length > 0 || !!urlParams.dateFrom || !!urlParams.dateTo,
+  );
   const [tagInput, setTagInput] = useState("");
 
   const [filters, setFilters] = useState<FilterState>({
@@ -165,6 +168,36 @@ export function ExplorePage() {
 
   const [nearMeLoading, setNearMeLoading] = useState(false);
   const [nearMeError, setNearMeError] = useState<string | null>(null);
+
+  // ── Sync URL → filters (handles navigation from tag clicks on detail page) ──
+  useEffect(() => {
+    const onPopState = () => {
+      const p = getUrlParams();
+      setFilters((prev) => {
+        // Only update if URL tags differ from current filter tags
+        const same =
+          p.query === prev.query &&
+          p.dateFrom === prev.dateFrom &&
+          p.dateTo === prev.dateTo &&
+          p.tags.length === prev.tags.length &&
+          p.tags.every((t, i) => t === prev.tags[i]);
+        if (same) return prev;
+        return {
+          ...prev,
+          query: p.query,
+          tags: p.tags,
+          dateFrom: p.dateFrom,
+          dateTo: p.dateTo,
+        };
+      });
+    };
+
+    // Also sync on mount in case URL was set before component mounted
+    onPopState();
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [getUrlParams]);
 
   // ── Sync filters → URL ─────────────────────────────────────────────────────
   useEffect(() => {

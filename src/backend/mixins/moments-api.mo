@@ -1,9 +1,12 @@
 import Runtime "mo:core/Runtime";
 import List "mo:core/List";
+import Principal "mo:core/Principal";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import MomentsLib "../lib/moments";
 import MediaLib "../lib/media";
 import UsersLib "../lib/users";
+import NotificationsLib "../lib/notifications";
+import ActivityLib "../lib/activity";
 import T "../types/moments";
 import UserTypes "../types/users";
 import Common "../types/common";
@@ -13,6 +16,8 @@ mixin (
   momentsState : MomentsLib.MomentsState,
   mediaState : MediaLib.MediaState,
   usersState : UsersLib.UsersState,
+  notificationsState : NotificationsLib.NotificationsState,
+  activityState : ActivityLib.ActivityState,
 ) {
   // ── Moment CRUD ───────────────────────────────────────────────────────────
   public shared ({ caller }) func createMoment(input : T.CreateMomentInput) : async Common.MomentId {
@@ -22,6 +27,10 @@ mixin (
     let momentId = MomentsLib.createMoment(momentsState, caller, input);
     // Create a default folder for the new moment
     ignore MediaLib.createDefaultFolder(mediaState, momentId);
+
+    // Record activity event so followers see it in their feed
+    ActivityLib.recordEvent(activityState, caller, #createdMoment, ?momentId, null);
+
     momentId;
   };
 
@@ -75,7 +84,7 @@ mixin (
   };
 
   public query ({ caller }) func getMyMoments() : async [T.MomentListItem] {
-    MomentsLib.listMomentsForUser(momentsState, caller, caller);
+    MomentsLib.listMyMoments(momentsState, caller);
   };
 
   // Returns all moments the caller is associated with for calendar display within a date range.
@@ -89,7 +98,7 @@ mixin (
   };
 
   public query ({ caller }) func getFeedMoments() : async [T.MomentListItem] {
-    let following = UsersLib.getFollowing(usersState, caller);
+    let following = UsersLib.getFollowing(usersState, caller, ?caller);
     let followingIds = following.map(func(p : UserTypes.UserProfilePublic) : Common.UserId { p.id });
     MomentsLib.listMomentsFromFollowing(momentsState, followingIds);
   };
@@ -150,6 +159,27 @@ mixin (
       Runtime.trap("Unauthorized: must be logged in");
     };
     MomentsLib.rsvp(momentsState, caller, momentId, status);
+
+    // For attending RSVPs: record activity + notify moment owner
+    if (status == #attending) {
+      ActivityLib.recordEvent(activityState, caller, #rsvpdToMoment, ?momentId, null);
+
+      // Notify the moment owner (if caller is not the owner)
+      switch (MomentsLib.getMoment(momentsState, momentId)) {
+        case (?m) {
+          if (not Principal.equal(m.owner, caller)) {
+            NotificationsLib.createNotification(
+              notificationsState,
+              m.owner,
+              #rsvpToYourMoment,
+              ?momentId,
+              "Someone RSVP'd to your moment"
+            );
+          };
+        };
+        case null {};
+      };
+    };
   };
 
   public query func getMomentAttendees(momentId : Common.MomentId) : async [T.Attendee] {

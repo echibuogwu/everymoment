@@ -1,10 +1,11 @@
 import { useActor } from "@caffeineai/core-infrastructure";
-import type { Principal } from "@icp-sdk/core/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createActor } from "../backend";
 import type {
   ActivityEvent,
   Announcement,
+  ConversationInboxResult,
   ConversationSummary,
   Message,
   MomentId,
@@ -222,10 +223,10 @@ export function useMarkAllNotificationsRead() {
 
 export function useConversations() {
   const { actor } = useBackend();
-  return useQuery<ConversationSummary[]>({
+  return useQuery<ConversationInboxResult>({
     queryKey: QUERY_KEYS.conversations,
     queryFn: async () => {
-      if (!actor) return [];
+      if (!actor) return { accepted: [], requests: [] };
       return actor.getMyConversations();
     },
     enabled: !!actor,
@@ -239,8 +240,7 @@ export function useConversation(userId: string | null) {
     queryKey: QUERY_KEYS.conversation(userId ?? ""),
     queryFn: async () => {
       if (!actor || !userId) return [];
-      const principal = { toString: () => userId } as Principal;
-      return actor.getConversation(principal);
+      return actor.getConversation(Principal.fromText(userId));
     },
     enabled: !!actor && !!userId,
     refetchInterval: 10_000,
@@ -362,7 +362,7 @@ export function useActivityFeed() {
       return actor.getActivityFeed();
     },
     enabled: !!actor,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
 }
 

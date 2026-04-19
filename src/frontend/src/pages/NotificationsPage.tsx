@@ -148,7 +148,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
         params: { username: target.params.username },
       });
     } else if (target.to === "/messages") {
-      navigate({ to: "/messages" });
+      navigate({ to: "/messages", search: { with: undefined } });
     } else if (target.to === "/dashboard") {
       navigate({ to: "/dashboard" });
     }

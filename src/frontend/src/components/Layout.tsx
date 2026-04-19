@@ -245,6 +245,7 @@ function GlassHeader({ scrolled }: { scrolled: boolean }) {
                 <DropdownMenuItem asChild>
                   <Link
                     to="/messages"
+                    search={{ with: undefined }}
                     className="flex items-center gap-2 cursor-pointer"
                     data-ocid="nav-messages"
                   >
@@ -378,6 +379,7 @@ function FloatingBottomNav({
             <Link
               key={to}
               to={to}
+              {...(to === "/messages" ? { search: { with: undefined } } : {})}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-full transition-colors duration-200",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

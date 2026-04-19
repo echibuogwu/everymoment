@@ -31,6 +31,7 @@ type UserProfilePublic =
    hideAttendingList: bool;
    hostedCount: nat;
    id: UserId;
+   isPrivateHidden: bool;
    isPrivateProfile: bool;
    location: opt text;
    name: opt text;
@@ -57,6 +58,7 @@ type UpdateMomentInput =
                     };
    coverImage: opt ExternalBlob;
    description: text;
+   endDate: opt Timestamp;
    eventDate: Timestamp;
    location: text;
    locationLat: opt float64;
@@ -141,6 +143,7 @@ type MomentListItem =
    coverImage: opt ExternalBlob;
    createdAt: Timestamp;
    description: text;
+   endDate: opt Timestamp;
    eventDate: Timestamp;
    id: MomentId;
    location: text;
@@ -164,6 +167,7 @@ type MomentDetail =
    coverImage: opt ExternalBlob;
    createdAt: Timestamp;
    description: text;
+   endDate: opt Timestamp;
    eventDate: Timestamp;
    id: MomentId;
    isOwner: bool;
@@ -233,6 +237,20 @@ type Media =
    momentId: MomentId;
    uploadedBy: UserId;
  };
+type FollowRequestStatus = 
+ variant {
+   accepted;
+   pending;
+   rejected;
+ };
+type FollowRequest = 
+ record {
+   createdAt: Timestamp;
+   fromId: UserId;
+   id: text;
+   status: FollowRequestStatus;
+   toId: UserId;
+ };
 type FolderId = nat;
 type Folder = 
  record {
@@ -252,6 +270,7 @@ type CreateMomentInput =
                     };
    coverImage: opt ExternalBlob;
    description: text;
+   endDate: opt Timestamp;
    eventDate: Timestamp;
    location: text;
    locationLat: opt float64;
@@ -269,9 +288,15 @@ type CreateFolderInput =
  };
 type ConversationSummary = 
  record {
+   isMessageRequest: bool;
    lastMessage: Message;
    unreadCount: nat;
    userId: UserId;
+ };
+type ConversationInboxResult = 
+ record {
+   accepted: vec ConversationSummary;
+   requests: vec ConversationSummary;
  };
 type CommentId = nat;
 type Comment = 
@@ -392,6 +417,8 @@ service : {
    (_ImmutableObjectStorageRefillResult);
   _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
   _initializeAccessControl: () -> ();
+  acceptFollowRequest: (requestId: text) -> ();
+  acceptMessageRequest: (fromId: UserId) -> ();
   addComment: (input: AddCommentInput) -> (CommentId);
   adminBulkImportMoments: (rows: vec BulkImportMomentRow) ->
    (BulkImportResult);
@@ -404,6 +431,7 @@ service : {
   adminListUsers: () -> (vec UserProfilePublic) query;
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
   bookmarkMoment: (momentId: MomentId) -> ();
+  cancelFollowRequest: (requestId: text) -> ();
   createFolder: (input: CreateFolderInput) -> (FolderId);
   createMoment: (input: CreateMomentInput) -> (MomentId);
   deleteAnnouncement: (momentId: MomentId, announcementId: nat) -> ();
@@ -414,8 +442,9 @@ service : {
                                            err: text;
                                            ok;
                                          });
+  deleteMessageRequest: (fromId: UserId) -> ();
   deleteMoment: (momentId: MomentId) -> ();
-  followUser: (target: UserId) -> ();
+  followUser: (target: UserId) -> (bool);
   getActivityFeed: () -> (vec ActivityEvent) query;
   getAnnouncementsForMoment: (momentId: MomentId) -> (vec Announcement) query;
   getCallerUserProfile: () -> (opt UserProfilePublic) query;
@@ -427,6 +456,7 @@ service : {
       ok: AttendanceInfo;
     }) query;
   getFeedMoments: () -> (vec MomentListItem) query;
+  getFollowRequestStatus: (targetId: UserId) -> (opt FollowRequest) query;
   getFollowers: (userId: UserId) -> (vec UserProfilePublic) query;
   getFollowing: (userId: UserId) -> (vec UserProfilePublic) query;
   getMedia: (mediaId: MediaId) -> (opt Media) query;
@@ -447,9 +477,10 @@ service : {
   getMyBookmarks: () -> (vec MomentId) query;
   getMyCalendarMoments: (rangeStart: Timestamp, rangeEnd: Timestamp) ->
    (vec MomentListItem) query;
-  getMyConversations: () -> (vec ConversationSummary) query;
+  getMyConversations: () -> (ConversationInboxResult) query;
   getMyMoments: () -> (vec MomentListItem) query;
   getMyNotifications: () -> (vec Notification) query;
+  getPendingFollowRequests: () -> (vec FollowRequest) query;
   getUnreadMessageCount: () -> (nat) query;
   getUnreadNotificationCount: () -> (nat) query;
   getUserProfile: (userId: UserId) -> (opt UserProfilePublic) query;
@@ -476,6 +507,7 @@ service : {
       err: text;
       ok: MemoryId;
     });
+  rejectFollowRequest: (requestId: text) -> ();
   requestMomentAccess: (momentId: MomentId) -> (variant {
                                                   err: text;
                                                   ok;
@@ -488,6 +520,7 @@ service : {
    opt Timestamp, dateRangeEnd: opt Timestamp, locationLat: opt float64,
    locationLng: opt float64, radiusKm: opt float64, offset: nat, limit:
    nat) -> (vec MomentListItem) query;
+  searchUsers: (prefix: text, limit: nat) -> (vec UserProfilePublic) query;
   sendMessage: (recipientId: UserId, "text": text) -> (nat);
   setRsvp: (momentId: MomentId, status: RsvpStatus) -> ();
   toggleLike: (mediaId: MediaId) -> (nat);

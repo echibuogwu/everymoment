@@ -1,14 +1,12 @@
-import Map "mo:core/Map";
 import List "mo:core/List";
-import Set "mo:core/Set";
-import Runtime "mo:core/Runtime";
+import Time "mo:core/Time";
 import Common "../types/common";
 import T "../types/activity";
 import UsersLib "users";
 
 module {
   public type ActivityState = {
-    // Global ordered list of all activity events (newest first)
+    // Global ordered list of all activity events (insertion order; newest at highest index)
     events : List.List<T.ActivityEvent>;
     var nextEventId : Nat;
   };
@@ -27,7 +25,17 @@ module {
     momentId : ?Common.MomentId,
     targetUserId : ?Common.UserId
   ) : () {
-    Runtime.trap("not implemented");
+    let id = state.nextEventId;
+    state.nextEventId += 1;
+    let evt : T.ActivityEvent = {
+      id;
+      actorId;
+      kind;
+      momentId;
+      targetUserId;
+      createdAt = Time.now();
+    };
+    state.events.add(evt);
   };
 
   // Returns activity events from users the caller follows, max 50, newest first
@@ -36,6 +44,20 @@ module {
     usersState : UsersLib.UsersState,
     callerId : Common.UserId
   ) : [T.ActivityEvent] {
-    Runtime.trap("not implemented");
+    let followingSet = UsersLib.getFollowingSet(usersState, callerId);
+    let results = List.empty<T.ActivityEvent>();
+
+    // Iterate from the end of the list (newest events) backwards
+    let all = state.events.toArray();
+    var i = all.size();
+    while (i > 0 and results.size() < 50) {
+      i -= 1;
+      let evt = all[i];
+      if (followingSet.contains(evt.actorId)) {
+        results.add(evt);
+      };
+    };
+
+    results.toArray();
   };
 };

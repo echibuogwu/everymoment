@@ -19,6 +19,7 @@ export const _ImmutableObjectStorageRefillResult = IDL.Record({
   'success' : IDL.Opt(IDL.Bool),
   'topped_up_amount' : IDL.Opt(IDL.Nat),
 });
+export const UserId = IDL.Principal;
 export const CommentId = IDL.Nat;
 export const MediaId = IDL.Nat;
 export const AddCommentInput = IDL.Record({
@@ -46,7 +47,6 @@ export const BulkImportResult = IDL.Record({
   'warnings' : IDL.Vec(IDL.Record({ 'row' : IDL.Nat, 'message' : IDL.Text })),
 });
 export const MomentId = IDL.Text;
-export const UserId = IDL.Principal;
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const MediaKind = IDL.Variant({
   'audio' : IDL.Null,
@@ -103,6 +103,7 @@ export const MomentListItem = IDL.Record({
   'locationLng' : IDL.Opt(IDL.Float64),
   'title' : IDL.Text,
   'attendeeCount' : IDL.Nat,
+  'endDate' : IDL.Opt(Timestamp),
   'owner' : UserId,
   'maxAttendees' : IDL.Opt(IDL.Nat),
   'createdAt' : Timestamp,
@@ -136,6 +137,7 @@ export const UserProfilePublic = IDL.Record({
   'attendedCount' : IDL.Nat,
   'followingCount' : IDL.Nat,
   'photo' : IDL.Opt(ExternalBlob),
+  'isPrivateHidden' : IDL.Bool,
   'location' : IDL.Opt(IDL.Text),
 });
 export const UserRole = IDL.Variant({
@@ -151,6 +153,7 @@ export const CreateMomentInput = IDL.Record({
   'locationLat' : IDL.Opt(IDL.Float64),
   'locationLng' : IDL.Opt(IDL.Float64),
   'title' : IDL.Text,
+  'endDate' : IDL.Opt(Timestamp),
   'maxAttendees' : IDL.Opt(IDL.Nat),
   'tags' : IDL.Vec(IDL.Text),
   'agendaItems' : IDL.Vec(
@@ -203,6 +206,18 @@ export const AttendanceInfo = IDL.Record({
   'username' : IDL.Text,
   'momentTitle' : IDL.Text,
 });
+export const FollowRequestStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'rejected' : IDL.Null,
+  'accepted' : IDL.Null,
+});
+export const FollowRequest = IDL.Record({
+  'id' : IDL.Text,
+  'status' : FollowRequestStatus,
+  'createdAt' : Timestamp,
+  'toId' : UserId,
+  'fromId' : UserId,
+});
 export const MemoryMediaKind = IDL.Variant({
   'audio' : IDL.Null,
   'video' : IDL.Null,
@@ -243,6 +258,7 @@ export const MomentDetail = IDL.Record({
   'locationLng' : IDL.Opt(IDL.Float64),
   'title' : IDL.Text,
   'attendeeCount' : IDL.Nat,
+  'endDate' : IDL.Opt(Timestamp),
   'callerAccessStatus' : IDL.Opt(AccessStatus),
   'owner' : UserId,
   'maxAttendees' : IDL.Opt(IDL.Nat),
@@ -262,7 +278,12 @@ export const MomentDetail = IDL.Record({
 export const ConversationSummary = IDL.Record({
   'userId' : UserId,
   'lastMessage' : Message,
+  'isMessageRequest' : IDL.Bool,
   'unreadCount' : IDL.Nat,
+});
+export const ConversationInboxResult = IDL.Record({
+  'requests' : IDL.Vec(ConversationSummary),
+  'accepted' : IDL.Vec(ConversationSummary),
 });
 export const NotificationKind = IDL.Variant({
   'accessRequestResolved' : IDL.Null,
@@ -322,6 +343,7 @@ export const UpdateMomentInput = IDL.Record({
   'locationLat' : IDL.Opt(IDL.Float64),
   'locationLng' : IDL.Opt(IDL.Float64),
   'title' : IDL.Text,
+  'endDate' : IDL.Opt(Timestamp),
   'maxAttendees' : IDL.Opt(IDL.Nat),
   'tags' : IDL.Vec(IDL.Text),
   'agendaItems' : IDL.Vec(
@@ -374,6 +396,8 @@ export const idlService = IDL.Service({
     ),
   '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControl' : IDL.Func([], [], []),
+  'acceptFollowRequest' : IDL.Func([IDL.Text], [], []),
+  'acceptMessageRequest' : IDL.Func([UserId], [], []),
   'addComment' : IDL.Func([AddCommentInput], [CommentId], []),
   'adminBulkImportMoments' : IDL.Func(
       [IDL.Vec(BulkImportMomentRow)],
@@ -389,6 +413,7 @@ export const idlService = IDL.Service({
   'adminListUsers' : IDL.Func([], [IDL.Vec(UserProfilePublic)], ['query']),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'bookmarkMoment' : IDL.Func([MomentId], [], []),
+  'cancelFollowRequest' : IDL.Func([IDL.Text], [], []),
   'createFolder' : IDL.Func([CreateFolderInput], [FolderId], []),
   'createMoment' : IDL.Func([CreateMomentInput], [MomentId], []),
   'deleteAnnouncement' : IDL.Func([MomentId, IDL.Nat], [], []),
@@ -400,8 +425,9 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'deleteMessageRequest' : IDL.Func([UserId], [], []),
   'deleteMoment' : IDL.Func([MomentId], [], []),
-  'followUser' : IDL.Func([UserId], [], []),
+  'followUser' : IDL.Func([UserId], [IDL.Bool], []),
   'getActivityFeed' : IDL.Func([], [IDL.Vec(ActivityEvent)], ['query']),
   'getAnnouncementsForMoment' : IDL.Func(
       [MomentId],
@@ -421,6 +447,11 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getFeedMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
+  'getFollowRequestStatus' : IDL.Func(
+      [UserId],
+      [IDL.Opt(FollowRequest)],
+      ['query'],
+    ),
   'getFollowers' : IDL.Func([UserId], [IDL.Vec(UserProfilePublic)], ['query']),
   'getFollowing' : IDL.Func([UserId], [IDL.Vec(UserProfilePublic)], ['query']),
   'getMedia' : IDL.Func([MediaId], [IDL.Opt(Media)], ['query']),
@@ -456,13 +487,14 @@ export const idlService = IDL.Service({
       [IDL.Vec(MomentListItem)],
       ['query'],
     ),
-  'getMyConversations' : IDL.Func(
-      [],
-      [IDL.Vec(ConversationSummary)],
-      ['query'],
-    ),
+  'getMyConversations' : IDL.Func([], [ConversationInboxResult], ['query']),
   'getMyMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
   'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+  'getPendingFollowRequests' : IDL.Func(
+      [],
+      [IDL.Vec(FollowRequest)],
+      ['query'],
+    ),
   'getUnreadMessageCount' : IDL.Func([], [IDL.Nat], ['query']),
   'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
   'getUserProfile' : IDL.Func(
@@ -502,6 +534,7 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : MemoryId, 'err' : IDL.Text })],
       [],
     ),
+  'rejectFollowRequest' : IDL.Func([IDL.Text], [], []),
   'requestMomentAccess' : IDL.Func(
       [MomentId],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
@@ -523,6 +556,11 @@ export const idlService = IDL.Service({
         IDL.Nat,
       ],
       [IDL.Vec(MomentListItem)],
+      ['query'],
+    ),
+  'searchUsers' : IDL.Func(
+      [IDL.Text, IDL.Nat],
+      [IDL.Vec(UserProfilePublic)],
       ['query'],
     ),
   'sendMessage' : IDL.Func([UserId, IDL.Text], [IDL.Nat], []),
@@ -548,6 +586,7 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Opt(IDL.Bool),
     'topped_up_amount' : IDL.Opt(IDL.Nat),
   });
+  const UserId = IDL.Principal;
   const CommentId = IDL.Nat;
   const MediaId = IDL.Nat;
   const AddCommentInput = IDL.Record({
@@ -575,7 +614,6 @@ export const idlFactory = ({ IDL }) => {
     'warnings' : IDL.Vec(IDL.Record({ 'row' : IDL.Nat, 'message' : IDL.Text })),
   });
   const MomentId = IDL.Text;
-  const UserId = IDL.Principal;
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const MediaKind = IDL.Variant({
     'audio' : IDL.Null,
@@ -629,6 +667,7 @@ export const idlFactory = ({ IDL }) => {
     'locationLng' : IDL.Opt(IDL.Float64),
     'title' : IDL.Text,
     'attendeeCount' : IDL.Nat,
+    'endDate' : IDL.Opt(Timestamp),
     'owner' : UserId,
     'maxAttendees' : IDL.Opt(IDL.Nat),
     'createdAt' : Timestamp,
@@ -659,6 +698,7 @@ export const idlFactory = ({ IDL }) => {
     'attendedCount' : IDL.Nat,
     'followingCount' : IDL.Nat,
     'photo' : IDL.Opt(ExternalBlob),
+    'isPrivateHidden' : IDL.Bool,
     'location' : IDL.Opt(IDL.Text),
   });
   const UserRole = IDL.Variant({
@@ -674,6 +714,7 @@ export const idlFactory = ({ IDL }) => {
     'locationLat' : IDL.Opt(IDL.Float64),
     'locationLng' : IDL.Opt(IDL.Float64),
     'title' : IDL.Text,
+    'endDate' : IDL.Opt(Timestamp),
     'maxAttendees' : IDL.Opt(IDL.Nat),
     'tags' : IDL.Vec(IDL.Text),
     'agendaItems' : IDL.Vec(
@@ -726,6 +767,18 @@ export const idlFactory = ({ IDL }) => {
     'username' : IDL.Text,
     'momentTitle' : IDL.Text,
   });
+  const FollowRequestStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'rejected' : IDL.Null,
+    'accepted' : IDL.Null,
+  });
+  const FollowRequest = IDL.Record({
+    'id' : IDL.Text,
+    'status' : FollowRequestStatus,
+    'createdAt' : Timestamp,
+    'toId' : UserId,
+    'fromId' : UserId,
+  });
   const MemoryMediaKind = IDL.Variant({
     'audio' : IDL.Null,
     'video' : IDL.Null,
@@ -766,6 +819,7 @@ export const idlFactory = ({ IDL }) => {
     'locationLng' : IDL.Opt(IDL.Float64),
     'title' : IDL.Text,
     'attendeeCount' : IDL.Nat,
+    'endDate' : IDL.Opt(Timestamp),
     'callerAccessStatus' : IDL.Opt(AccessStatus),
     'owner' : UserId,
     'maxAttendees' : IDL.Opt(IDL.Nat),
@@ -785,7 +839,12 @@ export const idlFactory = ({ IDL }) => {
   const ConversationSummary = IDL.Record({
     'userId' : UserId,
     'lastMessage' : Message,
+    'isMessageRequest' : IDL.Bool,
     'unreadCount' : IDL.Nat,
+  });
+  const ConversationInboxResult = IDL.Record({
+    'requests' : IDL.Vec(ConversationSummary),
+    'accepted' : IDL.Vec(ConversationSummary),
   });
   const NotificationKind = IDL.Variant({
     'accessRequestResolved' : IDL.Null,
@@ -845,6 +904,7 @@ export const idlFactory = ({ IDL }) => {
     'locationLat' : IDL.Opt(IDL.Float64),
     'locationLng' : IDL.Opt(IDL.Float64),
     'title' : IDL.Text,
+    'endDate' : IDL.Opt(Timestamp),
     'maxAttendees' : IDL.Opt(IDL.Nat),
     'tags' : IDL.Vec(IDL.Text),
     'agendaItems' : IDL.Vec(
@@ -897,6 +957,8 @@ export const idlFactory = ({ IDL }) => {
       ),
     '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControl' : IDL.Func([], [], []),
+    'acceptFollowRequest' : IDL.Func([IDL.Text], [], []),
+    'acceptMessageRequest' : IDL.Func([UserId], [], []),
     'addComment' : IDL.Func([AddCommentInput], [CommentId], []),
     'adminBulkImportMoments' : IDL.Func(
         [IDL.Vec(BulkImportMomentRow)],
@@ -912,6 +974,7 @@ export const idlFactory = ({ IDL }) => {
     'adminListUsers' : IDL.Func([], [IDL.Vec(UserProfilePublic)], ['query']),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'bookmarkMoment' : IDL.Func([MomentId], [], []),
+    'cancelFollowRequest' : IDL.Func([IDL.Text], [], []),
     'createFolder' : IDL.Func([CreateFolderInput], [FolderId], []),
     'createMoment' : IDL.Func([CreateMomentInput], [MomentId], []),
     'deleteAnnouncement' : IDL.Func([MomentId, IDL.Nat], [], []),
@@ -923,8 +986,9 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'deleteMessageRequest' : IDL.Func([UserId], [], []),
     'deleteMoment' : IDL.Func([MomentId], [], []),
-    'followUser' : IDL.Func([UserId], [], []),
+    'followUser' : IDL.Func([UserId], [IDL.Bool], []),
     'getActivityFeed' : IDL.Func([], [IDL.Vec(ActivityEvent)], ['query']),
     'getAnnouncementsForMoment' : IDL.Func(
         [MomentId],
@@ -944,6 +1008,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getFeedMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
+    'getFollowRequestStatus' : IDL.Func(
+        [UserId],
+        [IDL.Opt(FollowRequest)],
+        ['query'],
+      ),
     'getFollowers' : IDL.Func(
         [UserId],
         [IDL.Vec(UserProfilePublic)],
@@ -991,13 +1060,14 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(MomentListItem)],
         ['query'],
       ),
-    'getMyConversations' : IDL.Func(
-        [],
-        [IDL.Vec(ConversationSummary)],
-        ['query'],
-      ),
+    'getMyConversations' : IDL.Func([], [ConversationInboxResult], ['query']),
     'getMyMoments' : IDL.Func([], [IDL.Vec(MomentListItem)], ['query']),
     'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+    'getPendingFollowRequests' : IDL.Func(
+        [],
+        [IDL.Vec(FollowRequest)],
+        ['query'],
+      ),
     'getUnreadMessageCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getUserProfile' : IDL.Func(
@@ -1041,6 +1111,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : MemoryId, 'err' : IDL.Text })],
         [],
       ),
+    'rejectFollowRequest' : IDL.Func([IDL.Text], [], []),
     'requestMomentAccess' : IDL.Func(
         [MomentId],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
@@ -1062,6 +1133,11 @@ export const idlFactory = ({ IDL }) => {
           IDL.Nat,
         ],
         [IDL.Vec(MomentListItem)],
+        ['query'],
+      ),
+    'searchUsers' : IDL.Func(
+        [IDL.Text, IDL.Nat],
+        [IDL.Vec(UserProfilePublic)],
         ['query'],
       ),
     'sendMessage' : IDL.Func([UserId, IDL.Text], [IDL.Nat], []),

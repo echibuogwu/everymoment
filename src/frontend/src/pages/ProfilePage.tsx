@@ -13,8 +13,10 @@ import {
   Check,
   Edit2,
   ExternalLink,
+  Lock,
   LogIn,
   MapPin,
+  MessageCircle,
   Plus,
   Trash2,
   UserMinus,
@@ -176,7 +178,6 @@ function EditForm({
     [state, onChange],
   );
 
-  // Social helpers
   const addSocial = () => {
     if (state.socials.length >= 5) return;
     set({
@@ -192,7 +193,6 @@ function EditForm({
     set({ socials: updated });
   };
 
-  // Payment helpers
   const addPayment = () => {
     if (state.paymentDetails.length >= 10) return;
     set({
@@ -215,7 +215,6 @@ function EditForm({
     set({ paymentDetails: updated });
   };
 
-  // Username validation
   const handleUsernameBlur = async () => {
     const val = state.username.trim();
     if (!val || val === currentUsername) {
@@ -238,7 +237,6 @@ function EditForm({
     }
   };
 
-  // Photo change
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -492,7 +490,6 @@ function EditForm({
           Privacy Settings
         </h3>
 
-        {/* Private profile toggle */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <Label
@@ -514,7 +511,6 @@ function EditForm({
           />
         </div>
 
-        {/* Hide attending list toggle */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <Label
@@ -624,21 +620,16 @@ function BookmarkButton({
 function ProfileSkeleton() {
   return (
     <div>
-      {/* Banner skeleton */}
       <div className="h-48 w-full animate-shimmer rounded-none" />
       <div className="px-4 pb-6">
-        {/* Avatar */}
         <div className="flex justify-center -mt-12 mb-4">
           <Skeleton className="w-24 h-24 rounded-full ring-4 ring-background" />
         </div>
-        {/* Name + username */}
         <div className="flex flex-col items-center gap-2 mb-4">
           <Skeleton className="w-40 h-6 rounded-lg" />
           <Skeleton className="w-28 h-4 rounded-lg" />
         </div>
-        {/* Stats row */}
         <Skeleton className="w-full h-16 rounded-2xl mb-6" />
-        {/* Content */}
         <div className="space-y-3">
           <Skeleton className="w-full h-10 rounded-xl" />
           <Skeleton className="w-full h-10 rounded-xl" />
@@ -663,6 +654,91 @@ function StatItem({
         {value}
       </span>
       <span className="text-xs text-muted-foreground font-body">{label}</span>
+    </div>
+  );
+}
+
+// ── Private Profile Wall ──────────────────────────────────────────────────────
+
+function PrivateProfileWall({
+  user,
+  isFollowing,
+  isLoading,
+  onFollow,
+  onMessage,
+  isAuthenticated,
+  onSignIn,
+}: {
+  user: UserProfilePublic;
+  isFollowing: boolean;
+  isLoading: boolean;
+  onFollow: () => void;
+  onMessage: () => void;
+  isAuthenticated: boolean;
+  onSignIn: () => void;
+}) {
+  return (
+    <div
+      className="glass-card rounded-2xl p-8 flex flex-col items-center text-center gap-4 mx-4"
+      data-ocid="profile.private_wall"
+    >
+      <div className="w-14 h-14 rounded-full glass-card flex items-center justify-center">
+        <Lock className="w-6 h-6 text-muted-foreground" />
+      </div>
+      <div className="space-y-1">
+        <p className="font-display font-semibold text-foreground">
+          This account is private
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Follow @{user.username} to see their photos and moments
+        </p>
+      </div>
+
+      {isAuthenticated ? (
+        <div className="flex gap-3 w-full max-w-xs">
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.95 }}
+            onClick={onFollow}
+            disabled={isLoading}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold transition-smooth ${
+              isFollowing
+                ? "glass-card text-foreground"
+                : "bg-accent text-accent-foreground hover:opacity-90"
+            }`}
+            data-ocid="profile.follow_button"
+          >
+            {isFollowing ? (
+              <>
+                <UserMinus className="w-4 h-4" /> Following
+              </>
+            ) : (
+              <>
+                <UserPlus className="w-4 h-4" /> Follow
+              </>
+            )}
+          </motion.button>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.95 }}
+            onClick={onMessage}
+            className="glass-card flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
+            data-ocid="profile.message_button"
+          >
+            <MessageCircle className="w-4 h-4" />
+          </motion.button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onSignIn}
+          className="glass-card flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
+          data-ocid="profile.signin_button"
+        >
+          <LogIn className="w-3.5 h-3.5" />
+          Sign in to follow
+        </button>
+      )}
     </div>
   );
 }
@@ -771,7 +847,6 @@ export function ProfilePage() {
   const [editState, setEditState] = useState<EditState | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>("moments");
 
-  // Parallax for hero banner
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   const bannerY = useTransform(scrollY, [0, 300], [0, 90]);
@@ -807,10 +882,14 @@ export function ProfilePage() {
     enabled: isAuthenticated && !!actor && !!user && !isOwnProfile,
   });
 
+  const isFollowing = isFollowingQuery.data ?? false;
+
+  // For private profiles: following = accepted; not following = can request/not yet requested
+  // We use followUser/unfollowUser for both "request" and direct follow
   const followMutation = useMutation({
     mutationFn: async () => {
       if (!actor || !user) throw new Error("Not connected");
-      if (isFollowingQuery.data) {
+      if (isFollowing) {
         await actor.unfollowUser(user.id);
       } else {
         await actor.followUser(user.id);
@@ -824,7 +903,7 @@ export function ProfilePage() {
       await queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.userProfileByUsername(username),
       });
-      showSuccess(isFollowingQuery.data ? "Unfollowed" : "Now following!");
+      showSuccess(isFollowing ? "Unfollowed" : "Now following!");
     },
     onError: () => showError("Action failed. Try again."),
   });
@@ -887,13 +966,39 @@ export function ProfilePage() {
     setEditState(null);
   };
 
+  const handleMessage = () => {
+    if (!user) return;
+    if (!isAuthenticated) {
+      requireAuth(() => {});
+      return;
+    }
+    navigate({
+      to: "/messages",
+      search: { with: user.id.toText() },
+    });
+  };
+
   const avatarSrc = user?.photo ? user.photo.getDirectURL() : undefined;
   const avatarFallback = (user?.username ?? "??").slice(0, 2).toUpperCase();
+
+  // Determine if we need to show the private wall
+  // Private profile + not own profile + not following = show wall
+  const isPrivateAndBlocked =
+    !!user &&
+    !isOwnProfile &&
+    user.isPrivateProfile &&
+    !isFollowing &&
+    isAuthenticated;
+
+  const isPrivateAndUnauthenticated =
+    !!user && !isOwnProfile && user.isPrivateProfile && !isAuthenticated;
+
+  const showPrivateWall = isPrivateAndBlocked || isPrivateAndUnauthenticated;
 
   return (
     <AuthGuard requireAuth={false} currentPath={`/profile/${username}`}>
       <Layout>
-        {/* Back button — overlaid at top */}
+        {/* Back button */}
         <div className="px-4 pt-4 pb-0">
           <button
             type="button"
@@ -926,7 +1031,6 @@ export function ProfilePage() {
                 style={{ y: bannerY }}
                 className="absolute inset-0 w-full h-[130%] -top-[15%]"
               >
-                {/* Gradient banner with subtle pattern */}
                 <div
                   className="w-full h-full"
                   style={{
@@ -934,7 +1038,6 @@ export function ProfilePage() {
                       "linear-gradient(135deg, oklch(0.18 0.08 300) 0%, oklch(0.10 0.05 260) 40%, oklch(0.14 0.06 280) 100%)",
                   }}
                 >
-                  {/* Decorative circles for depth */}
                   <div
                     className="absolute -top-8 -right-8 w-48 h-48 rounded-full opacity-20"
                     style={{
@@ -949,17 +1052,8 @@ export function ProfilePage() {
                         "radial-gradient(circle, oklch(0.72 0.18 300), transparent 70%)",
                     }}
                   />
-                  <div
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full opacity-10"
-                    style={{
-                      background:
-                        "radial-gradient(circle, oklch(0.82 0.25 260), transparent 70%)",
-                    }}
-                  />
                 </div>
               </motion.div>
-
-              {/* Gradient fade to background at bottom */}
               <div
                 className="absolute inset-x-0 bottom-0 h-24"
                 style={{
@@ -987,6 +1081,12 @@ export function ProfilePage() {
                     </AvatarFallback>
                   </Avatar>
                 </div>
+                {/* Private badge */}
+                {user.isPrivateProfile && !isOwnProfile && (
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center">
+                    <Lock className="w-3 h-3 text-muted-foreground" />
+                  </div>
+                )}
               </motion.div>
 
               {/* Name + username */}
@@ -1016,107 +1116,154 @@ export function ProfilePage() {
                 )}
               </motion.div>
 
-              {/* ── Stats Row: Hosted | Attended | Following | Followers ── */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.35 }}
-                className="w-full mt-4"
-              >
-                <div className="glass-card rounded-2xl px-4 py-3 flex items-center">
-                  <StatItem
-                    value={user.hostedCount.toString()}
-                    label="Hosted"
-                  />
-                  <div className="w-px h-8 bg-border/50 self-center" />
-                  <StatItem
-                    value={user.attendedCount.toString()}
-                    label="Attended"
-                  />
-                  <div className="w-px h-8 bg-border/50 self-center" />
-                  <StatItem
-                    value={user.followingCount.toString()}
-                    label="Following"
-                  />
-                  <div className="w-px h-8 bg-border/50 self-center" />
-                  <StatItem
-                    value={user.followersCount.toString()}
-                    label="Followers"
-                  />
-                </div>
-              </motion.div>
+              {/* ── Stats Row (hidden for private+blocked) ── */}
+              {!showPrivateWall && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.35 }}
+                  className="w-full mt-4"
+                >
+                  <div className="glass-card rounded-2xl px-4 py-3 flex items-center">
+                    <StatItem
+                      value={user.hostedCount.toString()}
+                      label="Hosted"
+                    />
+                    <div className="w-px h-8 bg-border/50 self-center" />
+                    <StatItem
+                      value={user.attendedCount.toString()}
+                      label="Attended"
+                    />
+                    <div className="w-px h-8 bg-border/50 self-center" />
+                    <StatItem
+                      value={user.followingCount.toString()}
+                      label="Following"
+                    />
+                    <div className="w-px h-8 bg-border/50 self-center" />
+                    <StatItem
+                      value={user.followersCount.toString()}
+                      label="Followers"
+                    />
+                  </div>
+                </motion.div>
+              )}
 
               {/* ── Action buttons ── */}
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.28, duration: 0.3 }}
-                className="mt-4 w-full flex justify-center"
-              >
-                {isOwnProfile ? (
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    onClick={isEditing ? handleCancel : handleEditStart}
-                    className="glass-card flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
-                    data-ocid="profile.edit_button"
-                  >
-                    <motion.div
-                      animate={{ rotate: isEditing ? 45 : 0 }}
-                      transition={{ duration: 0.25 }}
+              {!showPrivateWall && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.28, duration: 0.3 }}
+                  className="mt-4 w-full flex justify-center gap-3"
+                >
+                  {isOwnProfile ? (
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 30,
+                      }}
+                      onClick={isEditing ? handleCancel : handleEditStart}
+                      className="glass-card flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
+                      data-ocid="profile.edit_button"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </motion.div>
-                    {isEditing ? "Cancel" : "Edit Profile"}
-                  </motion.button>
-                ) : isAuthenticated ? (
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    onClick={() => followMutation.mutate()}
-                    disabled={
-                      followMutation.isPending || isFollowingQuery.isLoading
-                    }
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-semibold transition-smooth ${
-                      isFollowingQuery.data
-                        ? "glass-card text-foreground hover:ring-1 hover:ring-border"
-                        : "bg-accent text-accent-foreground hover:opacity-90"
-                    }`}
-                    data-ocid="profile.follow_button"
-                  >
-                    {isFollowingQuery.data ? (
-                      <>
-                        <UserMinus className="w-4 h-4" /> Following
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4" /> Follow
-                      </>
-                    )}
-                  </motion.button>
-                ) : (
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    onClick={() => requireAuth(() => {})}
-                    disabled={isLoggingIn}
-                    className="glass-card flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
-                    data-ocid="profile.signin_button"
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    {isLoggingIn ? "Signing in…" : "Sign in to follow"}
-                  </motion.button>
-                )}
-              </motion.div>
+                      <motion.div
+                        animate={{ rotate: isEditing ? 45 : 0 }}
+                        transition={{ duration: 0.25 }}
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </motion.div>
+                      {isEditing ? "Cancel" : "Edit Profile"}
+                    </motion.button>
+                  ) : isAuthenticated ? (
+                    <>
+                      {/* Follow button */}
+                      <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.95 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30,
+                        }}
+                        onClick={() => followMutation.mutate()}
+                        disabled={
+                          followMutation.isPending || isFollowingQuery.isLoading
+                        }
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-semibold transition-smooth ${
+                          isFollowing
+                            ? "glass-card text-foreground hover:ring-1 hover:ring-border"
+                            : "bg-accent text-accent-foreground hover:opacity-90"
+                        }`}
+                        data-ocid="profile.follow_button"
+                      >
+                        {isFollowing ? (
+                          <>
+                            <UserMinus className="w-4 h-4" /> Following
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-4 h-4" /> Follow
+                          </>
+                        )}
+                      </motion.button>
+                      {/* Message button */}
+                      <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.95 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30,
+                        }}
+                        onClick={handleMessage}
+                        className="glass-card flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
+                        data-ocid="profile.message_button"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Message
+                      </motion.button>
+                    </>
+                  ) : (
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 30,
+                      }}
+                      onClick={() => requireAuth(() => {})}
+                      disabled={isLoggingIn}
+                      className="glass-card flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-foreground hover:ring-1 hover:ring-accent/40 transition-smooth"
+                      data-ocid="profile.signin_button"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      {isLoggingIn ? "Signing in…" : "Sign in to follow"}
+                    </motion.button>
+                  )}
+                </motion.div>
+              )}
             </div>
 
             {/* ── Content below hero ── */}
             <div className="px-4 mt-6 pb-8 space-y-6">
-              {/* Edit form */}
-              {isEditing && editState ? (
+              {/* Private wall — shown for private accounts the viewer doesn't follow */}
+              {showPrivateWall ? (
+                <PrivateProfileWall
+                  user={user}
+                  isFollowing={isFollowing}
+                  isLoading={
+                    followMutation.isPending || isFollowingQuery.isLoading
+                  }
+                  onFollow={() => followMutation.mutate()}
+                  onMessage={handleMessage}
+                  isAuthenticated={isAuthenticated}
+                  onSignIn={() => requireAuth(() => {})}
+                />
+              ) : isEditing && editState ? (
                 <EditForm
                   state={editState}
                   onChange={setEditState}
@@ -1148,113 +1295,110 @@ export function ProfilePage() {
                       <PaymentDetailsView details={user.paymentDetails} />
                     </motion.div>
                   )}
-                </>
-              )}
 
-              {/* ── Tabs: Moments / Saved (own profile only) ── */}
-              {!isEditing && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.44, duration: 0.35 }}
-                >
-                  {/* Tab switcher */}
-                  {isOwnProfile && (
-                    <div
-                      className="flex gap-1 glass-card rounded-2xl p-1 mb-5"
-                      data-ocid="profile.tabs"
+                  {/* ── Tabs: Moments / Saved (own profile only) ── */}
+                  {!isEditing && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.44, duration: 0.35 }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("moments")}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-sm font-medium transition-smooth ${
-                          activeTab === "moments"
-                            ? "bg-accent text-accent-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                        data-ocid="profile.moments_tab"
-                      >
-                        <Calendar className="w-3.5 h-3.5" />
-                        Moments
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("saved")}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-sm font-medium transition-smooth ${
-                          activeTab === "saved"
-                            ? "bg-accent text-accent-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                        data-ocid="profile.saved_tab"
-                      >
-                        <Bookmark className="w-3.5 h-3.5" />
-                        Saved
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Tab: Moments */}
-                  {activeTab === "moments" && (
-                    <>
-                      {!isOwnProfile && (
-                        <h2 className="text-gradient-accent font-display font-bold text-xl mb-4">
-                          Moments
-                        </h2>
-                      )}
-                      {momentsQuery.isLoading ? (
-                        <div className="space-y-4">
-                          {[1, 2].map((i) => (
-                            <Skeleton
-                              key={i}
-                              className="w-full h-52 rounded-2xl"
-                            />
-                          ))}
-                        </div>
-                      ) : momentsQuery.data?.length === 0 ? (
+                      {isOwnProfile && (
                         <div
-                          className="glass-card rounded-2xl p-8 flex flex-col items-center"
-                          data-ocid="profile.moments_empty_state"
+                          className="flex gap-1 glass-card rounded-2xl p-1 mb-5"
+                          data-ocid="profile.tabs"
                         >
-                          <EmptyState
-                            icon={Calendar}
-                            title="No moments yet"
-                            description="This user hasn't created any moments."
-                          />
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {momentsQuery.data?.map((moment, index) => (
-                            <div
-                              key={moment.id.toString()}
-                              className="relative"
-                              data-ocid={`profile.moment.item.${index + 1}`}
-                            >
-                              <MomentCard
-                                moment={moment}
-                                onClick={() =>
-                                  navigate({
-                                    to: "/moments/$momentId",
-                                    params: {
-                                      momentId: moment.id.toString(),
-                                    },
-                                  })
-                                }
-                              />
-                              {isAuthenticated && (
-                                <div className="absolute top-2 left-2 z-20">
-                                  <BookmarkButton momentId={moment.id} />
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("moments")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-sm font-medium transition-smooth ${
+                              activeTab === "moments"
+                                ? "bg-accent text-accent-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                            data-ocid="profile.moments_tab"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            Moments
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("saved")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-sm font-medium transition-smooth ${
+                              activeTab === "saved"
+                                ? "bg-accent text-accent-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                            data-ocid="profile.saved_tab"
+                          >
+                            <Bookmark className="w-3.5 h-3.5" />
+                            Saved
+                          </button>
                         </div>
                       )}
-                    </>
-                  )}
 
-                  {/* Tab: Saved (own profile only) */}
-                  {activeTab === "saved" && isOwnProfile && <SavedTab />}
-                </motion.div>
+                      {activeTab === "moments" && (
+                        <>
+                          {!isOwnProfile && (
+                            <h2 className="text-gradient-accent font-display font-bold text-xl mb-4">
+                              Moments
+                            </h2>
+                          )}
+                          {momentsQuery.isLoading ? (
+                            <div className="space-y-4">
+                              {[1, 2].map((i) => (
+                                <Skeleton
+                                  key={i}
+                                  className="w-full h-52 rounded-2xl"
+                                />
+                              ))}
+                            </div>
+                          ) : momentsQuery.data?.length === 0 ? (
+                            <div
+                              className="glass-card rounded-2xl p-8 flex flex-col items-center"
+                              data-ocid="profile.moments_empty_state"
+                            >
+                              <EmptyState
+                                icon={Calendar}
+                                title="No moments yet"
+                                description="This user hasn't created any moments."
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {momentsQuery.data?.map((moment, index) => (
+                                <div
+                                  key={moment.id.toString()}
+                                  className="relative"
+                                  data-ocid={`profile.moment.item.${index + 1}`}
+                                >
+                                  <MomentCard
+                                    moment={moment}
+                                    onClick={() =>
+                                      navigate({
+                                        to: "/moments/$momentId",
+                                        params: {
+                                          momentId: moment.id.toString(),
+                                        },
+                                      })
+                                    }
+                                  />
+                                  {isAuthenticated && (
+                                    <div className="absolute top-2 left-2 z-20">
+                                      <BookmarkButton momentId={moment.id} />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {activeTab === "saved" && isOwnProfile && <SavedTab />}
+                    </motion.div>
+                  )}
+                </>
               )}
             </div>
           </>

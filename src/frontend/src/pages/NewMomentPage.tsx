@@ -28,6 +28,7 @@ import { AuthGuard } from "../components/AuthGuard";
 import { Layout } from "../components/Layout";
 import { LocationInput } from "../components/LocationInput";
 import { useBackend } from "../hooks/use-backend";
+import type { CreateMomentInputWithEndDate } from "../lib/patched-backend";
 import { QUERY_KEYS } from "../lib/query-keys";
 import { showError, showSuccess } from "../lib/toast";
 import type { RecurrenceRule } from "../types";
@@ -260,6 +261,7 @@ export function NewMomentPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [maxAttendees, setMaxAttendees] = useState<string>("");
+  const [momentEndDate, setMomentEndDate] = useState("");
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
@@ -350,7 +352,16 @@ export function NewMomentPage() {
       const parsedMax =
         maxAttendees.trim() !== "" ? BigInt(maxAttendees) : undefined;
 
-      return actor.createMoment({
+      const parsedEndDate =
+        momentEndDate.trim() !== ""
+          ? BigInt(new Date(momentEndDate).getTime()) * 1_000_000n
+          : undefined;
+
+      return (
+        actor.createMoment as (
+          input: CreateMomentInputWithEndDate,
+        ) => Promise<string>
+      )({
         title: title.trim(),
         description: description.trim(),
         location: location.trim(),
@@ -362,12 +373,13 @@ export function NewMomentPage() {
         coverImage,
         recurrence,
         maxAttendees: parsedMax,
+        endDate: parsedEndDate,
         agendaItems: agendaItems
           .filter((i) => i.title.trim())
           .map((i) => ({
             title: i.title.trim(),
             time: i.time.trim(),
-            description: i.description.trim() || undefined,
+            description: i.description?.trim() || undefined,
           })),
       });
     },
@@ -581,7 +593,7 @@ export function NewMomentPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-xs text-muted-foreground font-body mb-1.5">
-                            Date *
+                            Start Date *
                           </p>
                           <input
                             type="date"
@@ -604,6 +616,23 @@ export function NewMomentPage() {
                             data-ocid="new-moment-time"
                           />
                         </div>
+                      </div>
+                      {/* End Date */}
+                      <div className="mt-3">
+                        <p className="text-xs text-muted-foreground font-body mb-1.5">
+                          End Date (optional)
+                        </p>
+                        <input
+                          type="date"
+                          value={momentEndDate}
+                          min={date}
+                          onChange={(e) => setMomentEndDate(e.target.value)}
+                          className={glassInput}
+                          data-ocid="new-moment-end-date-field"
+                        />
+                        <p className="text-xs text-muted-foreground font-body mt-1">
+                          For multi-day events. Leave blank if single-day.
+                        </p>
                       </div>
                     </div>
 

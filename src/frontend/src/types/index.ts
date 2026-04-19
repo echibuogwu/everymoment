@@ -32,7 +32,9 @@ export type {
   Notification,
   Message,
   ConversationSummary,
+  ConversationInboxResult,
   ActivityEvent,
+  FollowRequest,
 } from "../backend";
 
 export {
@@ -45,4 +47,5 @@ export {
   // New enums
   NotificationKind,
   ActivityKind,
+  FollowRequestStatus,
 } from "../backend";

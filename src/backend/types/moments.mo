@@ -47,6 +47,8 @@ module {
     locationLat : ?Float;
     locationLng : ?Float;
     eventDate : Common.Timestamp;
+    // null = no end date / single-day event
+    endDate : ?Common.Timestamp;
     tags : [Text];
     coverImage : ?Storage.ExternalBlob;
     visibility : Visibility;
@@ -67,6 +69,8 @@ module {
     locationLat : ?Float;
     locationLng : ?Float;
     eventDate : Common.Timestamp;
+    // null = no end date
+    endDate : ?Common.Timestamp;
     tags : [Text];
     coverImage : ?Storage.ExternalBlob;
     visibility : Visibility;
@@ -83,6 +87,8 @@ module {
     locationLat : ?Float;
     locationLng : ?Float;
     eventDate : Common.Timestamp;
+    // null = no end date
+    endDate : ?Common.Timestamp;
     tags : [Text];
     coverImage : ?Storage.ExternalBlob;
     visibility : Visibility;
@@ -125,6 +131,8 @@ module {
     locationLat : ?Float;
     locationLng : ?Float;
     eventDate : Common.Timestamp;
+    // null = no end date
+    endDate : ?Common.Timestamp;
     tags : [Text];
     coverImage : ?Storage.ExternalBlob;
     visibility : Visibility;
@@ -150,6 +158,8 @@ module {
     locationLat : ?Float;
     locationLng : ?Float;
     eventDate : Common.Timestamp;
+    // null = no end date
+    endDate : ?Common.Timestamp;
     tags : [Text];
     coverImage : ?Storage.ExternalBlob;
     visibility : Visibility;

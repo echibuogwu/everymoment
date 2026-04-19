@@ -200,6 +200,9 @@ const eventPassRoute = createRoute({
 const messagesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/messages",
+  validateSearch: (search: Record<string, unknown>) => ({
+    with: typeof search.with === "string" ? search.with : undefined,
+  }),
   component: () => (
     <Suspense fallback={<PageFallback />}>
       <MessagesPage />
